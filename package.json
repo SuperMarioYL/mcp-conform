@@ -1,0 +1,38 @@
+{
+  "name": "mcp-conform",
+  "version": "0.1.0",
+  "description": "Neutral cross-client MCP conformance harness: run any MCP server through Claude Code / Cursor / Gemini behavior + Zero-Touch OAuth checks and emit a per-client conformance matrix.",
+  "type": "module",
+  "license": "MIT",
+  "author": "supermario_leo",
+  "bin": {
+    "mcp-conform": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "fixtures",
+    "VERSION",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.fixtures.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "commander": "^12.0.0",
+    "picocolors": "^1.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}
