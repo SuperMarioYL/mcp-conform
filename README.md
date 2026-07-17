@@ -86,6 +86,9 @@ npx mcp-conform run node ./my-mcp-server.js --json
 
 # 3. 写出徽章 + 完整报告，贴进 README / 提交进仓库
 npx mcp-conform run node ./my-mcp-server.js --badge --report
+
+# 4. 跑 Zero-Touch OAuth 的活体 discovery 探测（HTTP 资源），让 auth 列变成真实 pass/fail
+npx mcp-conform run node ./my-mcp-server.js --base-url https://api.example.com/mcp
 ```
 
 | 选项 | 作用 |
@@ -95,6 +98,7 @@ npx mcp-conform run node ./my-mcp-server.js --badge --report
 | `--report [path]` | 写出完整 `report.json` |
 | `--cwd <dir>` | 被 spawn server 的工作目录 |
 | `--timeout <ms>` | 握手超时（默认 15000） |
+| `--base-url <url>` | HTTP 资源 base URL，跑 Zero-Touch OAuth discovery 探测（Protected Resource Metadata + `WWW-Authenticate`）。省略时（stdio）auth 列为 `skip` |
 
 退出码：任意 `fail` → 退出 `1`（CI 红）；`n/a` 与 `skip` 不会让 CI 失败。更多见 [`examples/`](./examples/)。
 
@@ -123,9 +127,10 @@ npx mcp-conform run node ./my-mcp-server.js --badge --report
 - [x] **m1 · 跑通校验集** — `run` 经 stdio 启动 server，跑握手 + tools 校验，打印 pass/fail。
 - [x] **m2 · 输出一致性矩阵** — Claude Code 适配器 + OAuth discovery 校验，彩色 client × {auth, behavior} 矩阵 + `badge.svg` / `report.json`。
 - [x] **m3 · 标准 fixture** — 内置 echo fixture，一条命令复现绿矩阵。
-- [ ] **Cursor 适配器** — 把矩阵第二行从 `n/a` 接成真实校验（v0.2）。
-- [ ] **Gemini 适配器** — 第三个真实客户端（v0.2+）。
+- [x] **v0.2 · 活体 OAuth discovery 探测** — `--base-url <url>` 让 auth 列从 `skip` 变成真实的 pass/fail（v0.1 写了校验但 CLI 从未把 base URL 接进去）。
+- [x] **v0.2 · 版本单一来源** — `clientInfo.version` 与 `--version` 统一从 `VERSION` 文件读取，不再硬编码。
 - [ ] **更深的 OAuth** — 在 discovery/shape 之上走端到端 token grant。
+- [ ] **真实 Cursor / Gemini 适配器** — MCP 协议在 stdio 上是 client 无关的，所以「真实」Cursor 适配器会和 Claude Code 跑同一批校验、只多一列而非多一项检查；待出现「客户端在协议层有差异」的真实需求再做。
 
 ## 许可证
 

@@ -86,6 +86,10 @@ npx mcp-conform run node ./my-mcp-server.js --json
 
 # 3. Write a badge + full report to paste into your README / commit
 npx mcp-conform run node ./my-mcp-server.js --badge --report
+
+# 4. Run the live Zero-Touch OAuth discovery probe (HTTP resource) so the auth
+#    column becomes a real pass/fail instead of the stdio skip
+npx mcp-conform run node ./my-mcp-server.js --base-url https://api.example.com/mcp
 ```
 
 | Option | Effect |
@@ -95,6 +99,7 @@ npx mcp-conform run node ./my-mcp-server.js --badge --report
 | `--report [path]` | Write the full `report.json` |
 | `--cwd <dir>` | Working directory for the spawned server |
 | `--timeout <ms>` | Handshake timeout (default 15000) |
+| `--base-url <url>` | HTTP base URL for the Zero-Touch OAuth discovery probe (Protected Resource Metadata + `WWW-Authenticate`). Omit for stdio (auth cell = `skip`) |
 
 Exit code: any `fail` → exit `1` (red CI); `n/a` and `skip` never fail CI. See [`examples/`](./examples/) for more.
 
@@ -123,9 +128,10 @@ It wins outright on *breadth* — a curated README will always list more servers
 - [x] **m1 · run the spec suite** — `run` spawns the server over stdio, runs handshake + tools checks, prints pass/fail.
 - [x] **m2 · emit the parity matrix** — Claude Code adapter + OAuth discovery checks, colored client × {auth, behavior} matrix + `badge.svg` / `report.json`.
 - [x] **m3 · canonical fixture** — bundled echo fixture, green matrix reproducible in one command.
-- [ ] **Cursor adapter** — turn the matrix's second row from `n/a` into real checks (v0.2).
-- [ ] **Gemini adapter** — a third real client (v0.2+).
+- [x] **v0.2 · live OAuth discovery probe** — `--base-url <url>` turns the auth cell from `skip` into a real pass/fail (v0.1 shipped the checks but the CLI never wired a base URL into them).
+- [x] **v0.2 · single-source version** — `clientInfo.version` and `--version` both read the `VERSION` file instead of a hardcoded literal.
 - [ ] **Deeper OAuth** — go beyond discovery/shape to an end-to-end token grant.
+- [ ] **Real Cursor / Gemini adapters** — the MCP protocol is client-agnostic over stdio, so a "real" Cursor adapter would run the same checks as Claude Code and only add a column, not a check; deferred until a real client-level protocol divergence surfaces.
 
 ## License
 

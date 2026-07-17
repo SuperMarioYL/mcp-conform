@@ -1,6 +1,6 @@
 {
   "name": "mcp-conform",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Neutral cross-client MCP conformance harness: run any MCP server through Claude Code / Cursor / Gemini behavior + Zero-Touch OAuth checks and emit a per-client conformance matrix.",
   "type": "module",
   "license": "MIT",

@@ -17,7 +17,8 @@ import {
   type ConformanceReport,
 } from "./adapters/types.js";
 import { claudeCodeAdapter } from "./adapters/claude-code.js";
-import { SPEC_VERSION } from "./spec/index.js";
+import { SPEC_VERSION, checkOAuth } from "./spec/index.js";
+import { VERSION } from "./version.js";
 
 /** The fixed three-client adapter set (real + stubs), in matrix column order. */
 export const ADAPTERS: ClientAdapter[] = [
@@ -39,6 +40,13 @@ export interface RunOptions {
   adapters?: ClientAdapter[];
   /** Connection timeout in ms (default 15000). */
   timeoutMs?: number;
+  /**
+   * Optional HTTP base URL of the server's resource. When set, the auth axis
+   * runs a live Zero-Touch OAuth discovery probe against it (Protected Resource
+   * Metadata + WWW-Authenticate challenge shape). When absent (the stdio case)
+   * the auth axis resolves to `skip` — faithfully, stdio has no HTTP surface.
+   */
+  baseUrl?: string;
 }
 
 /**
@@ -65,7 +73,7 @@ export async function run(opts: RunOptions): Promise<ConformanceReport> {
   });
 
   const client = new Client(
-    { name: "mcp-conform", version: "0.1.0" },
+    { name: "mcp-conform", version: VERSION },
     { capabilities: {} }
   );
 
@@ -77,7 +85,11 @@ export async function run(opts: RunOptions): Promise<ConformanceReport> {
     );
   } catch (err) {
     // Connect (= handshake) failed: every real adapter records a hard fail on
-    // the handshake check; stubs still emit their n/a rows.
+    // the handshake check; stubs still emit their n/a rows. The auth axis is
+    // independent of the stdio handshake (it probes an HTTP surface), so for a
+    // real adapter we still run the OAuth probe — over stdio (no baseUrl) that
+    // faithfully resolves to `skip`, keeping the matrix shape identical to a
+    // green run instead of collapsing the auth cell to an empty `n/a`.
     const detail = `failed to connect/handshake with server: ${errMessage(err)}`;
     for (const adapter of adapters) {
       if (adapter.implemented) {
@@ -88,10 +100,18 @@ export async function run(opts: RunOptions): Promise<ConformanceReport> {
           status: "fail",
           detail,
         });
+        report.results.push(
+          ...(await checkOAuth(adapter.id, { baseUrl: opts.baseUrl }))
+        );
       } else {
         report.results.push(
           ...(await adapter.run(
-            { client: adapter.id, serverCmd: opts.command, serverArgs: opts.args ?? [] },
+            {
+              client: adapter.id,
+              serverCmd: opts.command,
+              serverArgs: opts.args ?? [],
+              baseUrl: opts.baseUrl,
+            },
             undefined
           ))
         );
@@ -107,6 +127,7 @@ export async function run(opts: RunOptions): Promise<ConformanceReport> {
         client: adapter.id,
         serverCmd: opts.command,
         serverArgs: opts.args ?? [],
+        baseUrl: opts.baseUrl,
       };
       report.results.push(...(await adapter.run(ctx, client)));
     }

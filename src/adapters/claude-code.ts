@@ -35,8 +35,11 @@ export const claudeCodeAdapter: ClientAdapter = {
     results.push(...checkHandshake(ctx.client, client));
     results.push(...(await checkTools(ctx.client, client, ECHO_CALL)));
 
-    // Auth axis — stdio: discovery-shape probe with no HTTP base URL => skip.
-    results.push(...(await checkOAuth(ctx.client)));
+    // Auth axis — Zero-Touch OAuth discovery-shape probe. Over stdio (no HTTP
+    // base URL) this resolves to `skip` (yellow) — faithfully, stdio has no
+    // HTTP surface. With `ctx.baseUrl` (the `--base-url` flag) the probe hits a
+    // live HTTP resource and the auth cell becomes pass/fail.
+    results.push(...(await checkOAuth(ctx.client, { baseUrl: ctx.baseUrl })));
 
     return results;
   },

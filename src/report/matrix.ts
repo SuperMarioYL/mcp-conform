@@ -14,16 +14,19 @@ import type {
 
 const AXES: Axis[] = ["behavior", "auth"];
 
-/** Worst-case roll-up of a set of statuses into a single cell verdict. */
+/**
+ * Worst-case roll-up of a set of statuses into a single cell verdict.
+ *
+ * Precedence is `fail > pass > skip > n/a`: a hard failure dominates everything;
+ * otherwise a real `pass` wins; otherwise a `skip` (optional-yellow) dominates
+ * an `n/a` (stubbed) so a mixed `["skip","n/a"]` cell reads `skip` — the
+ * actionable signal is not hidden behind a stubbed cell. Empty -> `n/a`.
+ */
 export function rollup(statuses: CheckStatus[]): CheckStatus {
   if (statuses.length === 0) return "n/a";
   if (statuses.includes("fail")) return "fail";
-  if (statuses.every((s) => s === "n/a")) return "n/a";
-  if (statuses.includes("pass")) {
-    // pass dominates skip when at least one real check passed
-    return statuses.every((s) => s === "skip") ? "skip" : "pass";
-  }
-  if (statuses.every((s) => s === "skip")) return "skip";
+  if (statuses.includes("pass")) return "pass";
+  if (statuses.includes("skip")) return "skip";
   return "n/a";
 }
 

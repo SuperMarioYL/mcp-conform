@@ -42,11 +42,15 @@ export interface ConformanceReport {
  * `client` lets shared spec checks stamp the correct row. `serverCmd`/`serverArgs`
  * describe the spawned target; the runner owns the actual MCP SDK client so the
  * spawn happens exactly once and every adapter observes the same live server.
+ * `baseUrl` is the optional HTTP base URL for the Zero-Touch OAuth auth-axis
+ * probe; when absent (the stdio case) the auth checks resolve to `skip`.
  */
 export interface AdapterContext {
   client: ClientId;
   serverCmd: string;
   serverArgs: string[];
+  /** Optional HTTP base URL for the auth-axis OAuth discovery probe. */
+  baseUrl?: string;
 }
 
 /**

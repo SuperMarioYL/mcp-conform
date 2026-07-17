@@ -116,7 +116,22 @@ export async function checkOAuth(
 
   const fetchImpl = opts.fetchImpl ?? fetch;
   const results: CheckResult[] = [];
-  const origin = new URL(baseUrl).origin;
+
+  // Parse the HTTP origin up front. A malformed base URL (e.g. missing scheme)
+  // throws ERR_INVALID_URL outside the per-probe try/catch blocks below, which
+  // would reject the whole run and crash the CLI with no matrix. Fail both
+  // auth rows gracefully instead — the CI contract is "exit 1 on a fail row".
+  let origin: string;
+  try {
+    origin = new URL(baseUrl).origin;
+  } catch (err) {
+    const detail = `invalid base URL "${baseUrl}": ${errMessage(err)}`;
+    results.push(
+      row(client, "oauth.protected_resource_metadata", "fail", detail)
+    );
+    results.push(row(client, "oauth.www_authenticate", "fail", detail));
+    return results;
+  }
 
   // --- 1. Protected Resource Metadata ---
   const metadataUrl = `${origin}/.well-known/oauth-protected-resource`;

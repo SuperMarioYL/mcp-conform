@@ -12,6 +12,7 @@ import { Command } from "commander";
 import { run } from "./runner.js";
 import { matrixJson, renderMatrix } from "./report/matrix.js";
 import { buildBadgeJson, buildBadgeSvg } from "./report/badge.js";
+import { VERSION } from "./version.js";
 
 const program = new Command();
 
@@ -22,7 +23,7 @@ program
       "Claude Code / Cursor / Gemini behavior + Zero-Touch OAuth checks and " +
       "emit a per-client conformance matrix."
   )
-  .version("0.1.0");
+  .version(VERSION);
 
 program
   .command("run")
@@ -44,6 +45,12 @@ program
   )
   .option("--cwd <dir>", "Working directory for the spawned server.")
   .option("--timeout <ms>", "Handshake timeout in milliseconds.", "15000")
+  .option(
+    "--base-url <url>",
+    "HTTP base URL of the server's resource, to run the live Zero-Touch OAuth " +
+      "discovery probe (Protected Resource Metadata + WWW-Authenticate). When " +
+      "omitted (stdio) the auth axis resolves to skip."
+  )
   .action(async (serverCmd: string[], opts) => {
     const [command, ...args] = serverCmd;
     if (!command) {
@@ -56,6 +63,7 @@ program
       args,
       cwd: opts.cwd,
       timeoutMs: Number(opts.timeout) || 15_000,
+      baseUrl: opts.baseUrl,
     });
 
     if (opts.json) {

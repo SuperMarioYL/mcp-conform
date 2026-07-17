@@ -6,6 +6,8 @@
  * CI), so the spawn path matches exactly what a user gets from `npm run build`.
  */
 import { existsSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { createServer, type AddressInfo } from "node:http";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -21,6 +23,7 @@ import {
   validateProtectedResourceMetadata,
   checkOAuth,
 } from "../src/spec/index.js";
+import { VERSION } from "../src/version.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "..");
@@ -207,4 +210,108 @@ describe("oauth discovery-shape helpers", () => {
     });
     expect(rows.every((r) => r.status === "pass")).toBe(true);
   });
+});
+
+describe("v0.2.0 amendments", () => {
+  it("m4: VERSION reads the shipped version file (0.2.0)", () => {
+    expect(VERSION).toBe("0.2.0");
+  });
+
+  it("m4: `mcp-conform --version` prints the shipped version", () => {
+    const out = execFileSync(
+      process.execPath,
+      [resolve(repoRoot, "dist/cli.js"), "--version"],
+      { encoding: "utf8" }
+    );
+    expect(out.trim()).toBe("0.2.0");
+  });
+
+  it("m5: on handshake failure the auth cell stays skip (not n/a)", async () => {
+    const report = await run({
+      command: process.execPath,
+      args: ["-e", "process.exit(1)"],
+      timeoutMs: 5_000,
+    });
+    const view = buildMatrix(report);
+    const ccBehavior = view.cells.find(
+      (c) => c.client === "claude-code" && c.axis === "behavior"
+    );
+    expect(ccBehavior?.status).toBe("fail");
+    const ccAuth = view.cells.find(
+      (c) => c.client === "claude-code" && c.axis === "auth"
+    );
+    // Auth axis is independent of the stdio handshake — over stdio it stays
+    // skip, so the matrix shape matches a green run instead of collapsing to n/a.
+    expect(ccAuth?.status).toBe("skip");
+    expect(isGreen(report)).toBe(false);
+  }, 30_000);
+
+  it("m6: rollup precedence — skip dominates n/a", () => {
+    expect(rollup(["skip", "n/a"])).toBe("skip");
+  });
+
+  it("m6: rollup precedence — pass over n/a -> pass", () => {
+    expect(rollup(["pass", "n/a"])).toBe("pass");
+  });
+
+  it("m6: rollup precedence — pass over skip -> pass (no dead arm)", () => {
+    expect(rollup(["pass", "skip"])).toBe("pass");
+  });
+
+  it("m6: rollup precedence — n/a only -> n/a (still)", () => {
+    expect(rollup(["n/a", "n/a"])).toBe("n/a");
+  });
+
+  it("m7: an invalid --base-url yields two fail rows instead of throwing", async () => {
+    const rows = await checkOAuth("claude-code", {
+      baseUrl: "not-a-valid-url",
+    });
+    expect(rows.length).toBe(2);
+    expect(rows.every((r) => r.status === "fail")).toBe(true);
+    expect(rows[0]!.detail).toContain("invalid base URL");
+    expect(rows[1]!.detail).toContain("invalid base URL");
+  });
+
+  it("m8: --base-url runs the live Zero-Touch OAuth probe against an HTTP resource", async () => {
+    const metadata = {
+      resource: "http://127.0.0.1",
+      authorization_servers: ["http://127.0.0.1/auth"],
+    };
+    const server = createServer((req, res) => {
+      if (req.url?.endsWith("/.well-known/oauth-protected-resource")) {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify(metadata));
+        return;
+      }
+      res.writeHead(401, {
+        "www-authenticate":
+          'Bearer resource_metadata="http://127.0.0.1/.well-known/oauth-protected-resource"',
+      });
+      res.end("unauthorized");
+    });
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+    const port = (server.address() as AddressInfo).port;
+    const baseUrl = `http://127.0.0.1:${port}/mcp`;
+    try {
+      const report = await run({
+        command: process.execPath,
+        args: [echoServer],
+        baseUrl,
+      });
+      const view = buildMatrix(report);
+      // Auth cell becomes a real pass (live discovery probe).
+      const ccAuth = view.cells.find(
+        (c) => c.client === "claude-code" && c.axis === "auth"
+      );
+      expect(ccAuth?.status).toBe("pass");
+      // Behavior axis is still green (the stdio echo fixture).
+      const ccBehavior = view.cells.find(
+        (c) => c.client === "claude-code" && c.axis === "behavior"
+      );
+      expect(ccBehavior?.status).toBe("pass");
+      expect(isGreen(report)).toBe(true);
+    } finally {
+      server.close();
+    }
+  }, 30_000);
 });
