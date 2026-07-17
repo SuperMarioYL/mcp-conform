@@ -11,12 +11,12 @@
       "en": "Neutral · one command · cross-client"
     },
     "headline": {
-      "zh": "给任意 MCP server\n一张跨客户端一致性矩阵",
-      "en": "Any MCP server,\na cross-client conformance matrix"
+      "zh": "「Cursor 能跑、\nClaude Code 不行？」\n一条命令拿到证据",
+      "en": "\"Works in Cursor,\nbreaks in Claude Code?\"\nOne command, real proof."
     },
     "sub": {
-      "zh": "经 stdio 启动你的 server，跑行为 + Zero-Touch OAuth 校验，输出 client × {behavior, auth} 类型化矩阵与徽章。单个 Node CLI，一个进程。",
-      "en": "Spawns your server over stdio, runs behavior + Zero-Touch OAuth checks, and emits a typed client × {behavior, auth} matrix plus a badge. One Node CLI, one process."
+      "zh": "给 MCP server 的作者：一条命令在你本机把 server 真跑一遍，告诉你它在每个客户端里行为是否一致、鉴权是否对得上，再生成一张能贴进 README 的徽章。开源、MIT，不偏袒任何客户端厂商。",
+      "en": "For MCP server authors: one command actually runs your server on your machine, tells you whether it behaves consistently across clients and whether its auth lines up, then generates a badge for your README. Open source, MIT, no vendor bias."
     },
     "command": "npx mcp-conform run node ./my-mcp-server.js",
     "cta": { "zh": "开始使用", "en": "Get started" },
@@ -24,47 +24,47 @@
   },
   "advantages": [
     {
-      "title": { "zh": "一条命令，跑任意 server", "en": "One command, any server" },
+      "title": { "zh": "一条命令，跑你自己的 server", "en": "One command, your own server" },
       "body": {
-        "zh": "npx mcp-conform run 接「你如何启动自己的 server」整条命令，经 stdio JSON-RPC 起子进程，跑 initialize 握手与 tools/list 校验，打印彩色矩阵。无需安装，用内置 echo fixture 三条命令复现首个绿矩阵。",
-        "en": "npx mcp-conform run takes the full command for how you start your own server, spawns it over stdio JSON-RPC, runs the initialize handshake and tools/list checks, and prints a colored matrix. No install — three commands to a first green matrix with the built-in echo fixture."
+        "zh": "不用搭测试脚手架，也不用改你的 server。告诉它「你平时怎么启动 server」，它就在你本机把 server 真正跑起来、挨个客户端对照检查。内置一个示例 server，三条命令复现第一张全绿矩阵。",
+        "en": "No test harness to set up, no changes to your server. Tell it how you normally start your server and it actually runs it on your machine, checking it against each client. Ships with a sample server — three commands to your first all-green matrix."
       },
       "chips": [
-        "› stdio JSON-RPC",
-        "› 15s 握手超时"
+        "› 不用改你的 server",
+        "› 内置示例 server"
       ]
     },
     {
-      "title": { "zh": "类型化一致性矩阵", "en": "A typed conformance matrix" },
+      "title": { "zh": "把传闻变成一张对照表", "en": "Turn hearsay into a table" },
       "body": {
-        "zh": "核心 primitive 是一张以 (client, axis, check_id) 为键的类型化报告：axis ∈ {behavior, auth}，status ∈ {pass, fail, skip, n/a}，失败时带上具体断言名。今天没有别的工具能在单张类型化报告里断言「跨客户端行为一致」。",
-        "en": "The core primitive is a typed report keyed by (client, axis, check_id): axis ∈ {behavior, auth}, status ∈ {pass, fail, skip, n/a}, and a fail carries the exact assertion name. Nothing else today asserts \"cross-client behavior parity\" in a single typed report."
+        "zh": "「在 Cursor 能跑、在 Claude Code 不行」不再是群聊里的一句传闻。你拿到一张每客户端的行为 + 鉴权对照表：哪项过了、哪项没过、没过的是哪一条检查，一目了然。今天没有别的工具能在一张表里断言「跨客户端行为一致」。",
+        "en": "\"Works in Cursor, breaks in Claude Code\" stops being a chat-room rumor. You get a per-client behavior + auth table: what passed, what failed, and exactly which check failed — at a glance. Nothing else today asserts \"cross-client behavior parity\" in a single table."
       },
       "chips": [
-        "› (client, axis, check_id) 键",
-        "› pass / fail / skip / n/a"
+        "› 每客户端一行",
+        "› 失败指到具体检查"
       ]
     },
     {
-      "title": { "zh": "活体 Zero-Touch OAuth 探测", "en": "Live Zero-Touch OAuth probe" },
+      "title": { "zh": "鉴权对不对，跑一次就知道", "en": "Is the auth right? Run once and know" },
       "body": {
-        "zh": "--base-url <url> 让 auth 列从 stdio 的 skip 变成真实 pass/fail：对 HTTP 资源跑 Protected Resource Metadata 与 WWW-Authenticate Bearer challenge 的活体 discovery 探测。v0.1 写了校验形状但 CLI 从未把 base URL 接进去——v0.2 补上了。",
-        "en": "--base-url <url> turns the auth column from a stdio skip into a real pass/fail: it runs a live discovery probe of Protected Resource Metadata and the WWW-Authenticate Bearer challenge against an HTTP resource. v0.1 shipped the check shape but the CLI never wired a base URL into it — v0.2 closes that gap."
+        "zh": "不用再猜你的 server 鉴权是不是按规范来的。给它一个线上地址，它真的去探一下你的鉴权是不是按各客户端期待的方式接好的——从「跳过」变成实打实的过 / 不过。",
+        "en": "Stop guessing whether your server's auth follows the spec. Give it a live URL and it actually probes whether your auth is wired the way clients expect — turning a \"skipped\" into a real pass or fail."
       },
       "chips": [
-        "› Protected Resource Metadata",
-        "› WWW-Authenticate Bearer"
+        "› 给个地址，真跑一遍",
+        "› 不再是「跳过」"
       ]
     },
     {
-      "title": { "zh": "CI-ready 徽章 + JSON", "en": "CI-ready badge + JSON" },
+      "title": { "zh": "README 里贴徽章，CI 里挡回归", "en": "A badge for README, a gate for CI" },
       "body": {
-        "zh": "--badge 写出 badge.svg + badge.json 贴进 README，--report 写完整 report.json，--json 打印稳定类型化矩阵供 CI 断言。任意 fail 退出 1（CI 红），n/a 与 skip 不让 CI 失败。",
-        "en": "--badge writes badge.svg + badge.json to drop into your README, --report writes the full report.json, and --json prints a stable typed matrix for CI assertion. Any fail exits 1 (CI red); n/a and skip never fail CI."
+        "zh": "一条命令写出能贴进 README 的徽章和完整报告。把检查接进 CI：哪天某个客户端从「过」掉到「不过」，构建立刻变红、拦住回归。可选检查不通过也不会误报。",
+        "en": "One command writes a badge for your README and a full report. Wire it into CI: the day a client drops from pass to fail, the build goes red and blocks the regression. Optional checks that don't pass never cause false alarms."
       },
       "chips": [
-        "› badge.svg + report.json",
-        "› fail → 退出 1"
+        "› 一键出徽章 + 报告",
+        "› 回归即红灯"
       ]
     }
   ],
@@ -85,8 +85,8 @@
   },
   "footer": {
     "tag": {
-      "zh": "中立的跨客户端 MCP 一致性校验工具",
-      "en": "The neutral cross-client MCP conformance harness"
+      "zh": "中立的跨客户端 MCP 一致性，一条命令搞定",
+      "en": "Neutral cross-client MCP parity, in one command"
     }
   }
 }
