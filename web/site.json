@@ -1,0 +1,92 @@
+{
+  "schema": 1,
+  "name": "mcp-conform",
+  "github": "https://github.com/SuperMarioYL/mcp-conform",
+  "host": "mcp-conform.lei6393.com",
+  "lang": { "primary": "zh", "toggle": true },
+  "accent": ["#0071E3"],
+  "hero": {
+    "eyebrow": {
+      "zh": "中立 · 一条命令 · 跨客户端",
+      "en": "Neutral · one command · cross-client"
+    },
+    "headline": {
+      "zh": "给任意 MCP server\n一张跨客户端一致性矩阵",
+      "en": "Any MCP server,\na cross-client conformance matrix"
+    },
+    "sub": {
+      "zh": "经 stdio 启动你的 server，跑行为 + Zero-Touch OAuth 校验，输出 client × {behavior, auth} 类型化矩阵与徽章。单个 Node CLI，一个进程。",
+      "en": "Spawns your server over stdio, runs behavior + Zero-Touch OAuth checks, and emits a typed client × {behavior, auth} matrix plus a badge. One Node CLI, one process."
+    },
+    "command": "npx mcp-conform run node ./my-mcp-server.js",
+    "cta": { "zh": "开始使用", "en": "Get started" },
+    "ctaGithub": { "zh": "在 GitHub 查看", "en": "View on GitHub" }
+  },
+  "advantages": [
+    {
+      "title": { "zh": "一条命令，跑任意 server", "en": "One command, any server" },
+      "body": {
+        "zh": "npx mcp-conform run 接「你如何启动自己的 server」整条命令，经 stdio JSON-RPC 起子进程，跑 initialize 握手与 tools/list 校验，打印彩色矩阵。无需安装，用内置 echo fixture 三条命令复现首个绿矩阵。",
+        "en": "npx mcp-conform run takes the full command for how you start your own server, spawns it over stdio JSON-RPC, runs the initialize handshake and tools/list checks, and prints a colored matrix. No install — three commands to a first green matrix with the built-in echo fixture."
+      },
+      "chips": [
+        "› stdio JSON-RPC",
+        "› 15s 握手超时"
+      ]
+    },
+    {
+      "title": { "zh": "类型化一致性矩阵", "en": "A typed conformance matrix" },
+      "body": {
+        "zh": "核心 primitive 是一张以 (client, axis, check_id) 为键的类型化报告：axis ∈ {behavior, auth}，status ∈ {pass, fail, skip, n/a}，失败时带上具体断言名。今天没有别的工具能在单张类型化报告里断言「跨客户端行为一致」。",
+        "en": "The core primitive is a typed report keyed by (client, axis, check_id): axis ∈ {behavior, auth}, status ∈ {pass, fail, skip, n/a}, and a fail carries the exact assertion name. Nothing else today asserts \"cross-client behavior parity\" in a single typed report."
+      },
+      "chips": [
+        "› (client, axis, check_id) 键",
+        "› pass / fail / skip / n/a"
+      ]
+    },
+    {
+      "title": { "zh": "活体 Zero-Touch OAuth 探测", "en": "Live Zero-Touch OAuth probe" },
+      "body": {
+        "zh": "--base-url <url> 让 auth 列从 stdio 的 skip 变成真实 pass/fail：对 HTTP 资源跑 Protected Resource Metadata 与 WWW-Authenticate Bearer challenge 的活体 discovery 探测。v0.1 写了校验形状但 CLI 从未把 base URL 接进去——v0.2 补上了。",
+        "en": "--base-url <url> turns the auth column from a stdio skip into a real pass/fail: it runs a live discovery probe of Protected Resource Metadata and the WWW-Authenticate Bearer challenge against an HTTP resource. v0.1 shipped the check shape but the CLI never wired a base URL into it — v0.2 closes that gap."
+      },
+      "chips": [
+        "› Protected Resource Metadata",
+        "› WWW-Authenticate Bearer"
+      ]
+    },
+    {
+      "title": { "zh": "CI-ready 徽章 + JSON", "en": "CI-ready badge + JSON" },
+      "body": {
+        "zh": "--badge 写出 badge.svg + badge.json 贴进 README，--report 写完整 report.json，--json 打印稳定类型化矩阵供 CI 断言。任意 fail 退出 1（CI 红），n/a 与 skip 不让 CI 失败。",
+        "en": "--badge writes badge.svg + badge.json to drop into your README, --report writes the full report.json, and --json prints a stable typed matrix for CI assertion. Any fail exits 1 (CI red); n/a and skip never fail CI."
+      },
+      "chips": [
+        "› badge.svg + report.json",
+        "› fail → 退出 1"
+      ]
+    }
+  ],
+  "scene": {
+    "kind": "hub-nodes",
+    "nodes": ["Claude Code", "Cursor", "Gemini"]
+  },
+  "cta": {
+    "headline": {
+      "zh": "把「在 Cursor 能跑、在 Claude Code 不行」的传闻，变成一张可发布的矩阵",
+      "en": "Turn \"works in Cursor, not Claude Code\" hearsay into a publishable matrix"
+    },
+    "sub": {
+      "zh": "开源、MIT、无付费墙。中立跨厂商一致性，没有哪个客户端厂商能独占。",
+      "en": "Open source, MIT, no paywall. Neutral cross-vendor parity no single client can own."
+    },
+    "button": { "zh": "在 GitHub 上开始", "en": "Get started on GitHub" }
+  },
+  "footer": {
+    "tag": {
+      "zh": "中立的跨客户端 MCP 一致性校验工具",
+      "en": "The neutral cross-client MCP conformance harness"
+    }
+  }
+}
