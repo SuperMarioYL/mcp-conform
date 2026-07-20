@@ -3,7 +3,7 @@
   "version": "0.2.0",
   "description": "Neutral cross-client MCP conformance harness: run any MCP server through Claude Code / Cursor / Gemini behavior + Zero-Touch OAuth checks and emit a per-client conformance matrix.",
   "type": "module",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "author": "supermario_leo",
   "bin": {
     "mcp-conform": "dist/cli.js"
