@@ -91,6 +91,7 @@ export async function run(opts: RunOptions): Promise<ConformanceReport> {
     // faithfully resolves to `skip`, keeping the matrix shape identical to a
     // green run instead of collapsing the auth cell to an empty `n/a`.
     const detail = `failed to connect/handshake with server: ${errMessage(err)}`;
+    const skipDetail = "skipped: handshake failed";
     for (const adapter of adapters) {
       if (adapter.implemented) {
         report.results.push({
@@ -100,6 +101,29 @@ export async function run(opts: RunOptions): Promise<ConformanceReport> {
           status: "fail",
           detail,
         });
+        // Keep the behavior row set stable across green/failure runs. The m5
+        // fix (v0.2.0) added auth-axis skip rows here so the auth cell stayed
+        // `skip` not `n/a` ("the matrix keeps the same row set as the green
+        // path") — but applied that to the AUTH axis only. The behavior axis
+        // otherwise drops handshake.server_info/capabilities + tools.* silently,
+        // leaving the raw report with 1 behavior row on failure vs 5 on green
+        // (unstable for `--report` diffing). Emit `skip` rows for the checks
+        // that could not run so the row set matches a green run; the cell
+        // verdict is unchanged (rollup([fail, …skip]) === "fail").
+        for (const check_id of [
+          "handshake.server_info",
+          "handshake.capabilities",
+          "tools.list_schema",
+          "tools.call_roundtrip",
+        ]) {
+          report.results.push({
+            client: adapter.id,
+            axis: "behavior",
+            check_id,
+            status: "skip",
+            detail: skipDetail,
+          });
+        }
         report.results.push(
           ...(await checkOAuth(adapter.id, { baseUrl: opts.baseUrl }))
         );

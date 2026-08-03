@@ -1,11 +1,40 @@
 # Changelog
 
-All notable changes to this project are documented here.
+All notable changes to this project are documented in this changelog.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.3.0] - 2026-08-03
+
+### Fixed
+- **OAuth discovery URL-shape validation** — `validateProtectedResourceMetadata`
+  and the `WWW-Authenticate` Bearer probe only checked that `resource`,
+  `authorization_servers`, and the `resource_metadata` challenge parameter were
+  non-empty strings, but RFC 9728 requires them to be URLs. A malformed metadata
+  document (e.g. `{resource: "garbage", authorization_servers: ["not-a-url"]}`) or
+  a challenge pointing `resource_metadata` at a non-URL previously **passed**,
+  false-passing a non-conformant server. Both now validate `new URL()` parses
+  (http/https) and fail with a precise detail instead of false-passing.
+- **Stable behavior row set on handshake failure** — when `client.connect` failed,
+  the real adapter pushed only a single `handshake.initialize` fail row and silently
+  dropped `handshake.server_info`, `handshake.capabilities`, `tools.list_schema`,
+  and `tools.call_roundtrip`, so the raw report (`--report report.json`) had 1
+  behavior row on a failure run vs 5 on a green run. The v0.2.0 `m5` fix added
+  auth-axis skip rows to keep the matrix shape stable, but applied that principle
+  to the auth axis only. The behavior axis now emits `skip` rows for the checks that
+  could not run, so the report row set is stable across green/failure runs (the
+  matrix cell verdict is unchanged — `rollup([fail, …skip]) === "fail"`).
+- **Stale stub version labels** — the Cursor and Gemini stub messages promised
+  "(v0.2)" adapters, but v0.2.0 shipped without them and reframed them as deferred
+  (the MCP protocol is client-agnostic over stdio, so a real adapter would only add
+  a column, not a check). The stale version promise is dropped.
+
+### Changed
+- No new CLI flag, no new adapter, no stack change. v0.3.0 deepens auth-axis shape
+  fidelity and report stability.
 
 ## [0.2.0] - 2026-07-17
 
@@ -44,10 +73,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   client-agnostic over stdio, so a "real" Cursor adapter would duplicate the Claude
   Code checks and only add a column, not a check.
 
-[Unreleased]: https://github.com/SuperMarioYL/mcp-conform/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/SuperMarioYL/mcp-conform/releases/tag/v0.2.0
-[0.1.0]: https://github.com/SuperMarioYL/mcp-conform/releases/tag/v0.1.0
-
 ## [0.1.0] - 2026-06-19
 
 ### Added
@@ -68,3 +93,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bundled echo fixture server for a reproducible green-path demo.
 - Vitest suite covering the runner, spec checks, matrix roll-up, and badge output.
 
+[Unreleased]: https://github.com/SuperMarioYL/mcp-conform/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/SuperMarioYL/mcp-conform/releases/tag/v0.3.0
+[0.2.0]: https://github.com/SuperMarioYL/mcp-conform/releases/tag/v0.2.0
+[0.1.0]: https://github.com/SuperMarioYL/mcp-conform/releases/tag/v0.1.0

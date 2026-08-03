@@ -99,26 +99,34 @@ export function naRows(client: ClientId, reason: string): CheckResult[] {
 
 /**
  * Cursor adapter — typed stub. Returns `n/a` for every axis.
- * A real Cursor adapter is deferred to v0.2 (mvp_plan out_of_scope).
+ * A real Cursor adapter is deferred — the MCP protocol is client-agnostic over
+ * stdio, so a real adapter would only add a matrix column, not a check.
  */
 export const cursorAdapter: ClientAdapter = {
   id: "cursor",
   label: "Cursor",
   implemented: false,
   async run(ctx) {
-    return naRows(ctx.client, "Cursor adapter not yet implemented (v0.2)");
+    return naRows(
+      ctx.client,
+      "Cursor adapter not yet implemented (deferred — MCP is client-agnostic over stdio, so a real adapter only adds a column, not a check)"
+    );
   },
 };
 
 /**
  * Gemini adapter — typed stub. Returns `n/a` for every axis.
- * A real Gemini adapter is deferred to v0.2 (mvp_plan out_of_scope).
+ * A real Gemini adapter is deferred — the MCP protocol is client-agnostic over
+ * stdio, so a real adapter would only add a matrix column, not a check.
  */
 export const geminiAdapter: ClientAdapter = {
   id: "gemini",
   label: "Gemini",
   implemented: false,
   async run(ctx) {
-    return naRows(ctx.client, "Gemini adapter not yet implemented (v0.2)");
+    return naRows(
+      ctx.client,
+      "Gemini adapter not yet implemented (deferred — MCP is client-agnostic over stdio, so a real adapter only adds a column, not a check)"
+    );
   },
 };

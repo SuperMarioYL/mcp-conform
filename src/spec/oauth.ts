@@ -59,6 +59,20 @@ export function parseWwwAuthenticate(header: string): {
   return { scheme, params };
 }
 
+/** True iff s is a parseable absolute http(s) URL. RFC 9728 `resource` and
+ * `authorization_servers` entries (and the WWW-Authenticate `resource_metadata`
+ * param) are URLs, so a non-URL value is malformed discovery metadata, not a
+ * passing shape — a conformance tool must not false-pass it. */
+function isUrl(s: unknown): s is string {
+  if (typeof s !== "string" || s.length === 0) return false;
+  try {
+    const u = new URL(s);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 /** Validate the SHAPE of a Protected Resource Metadata document (RFC 9728). */
 export function validateProtectedResourceMetadata(doc: unknown): {
   ok: boolean;
@@ -68,17 +82,21 @@ export function validateProtectedResourceMetadata(doc: unknown): {
     return { ok: false, detail: "metadata is not a JSON object" };
   }
   const d = doc as Record<string, unknown>;
-  if (typeof d.resource !== "string" || d.resource.length === 0) {
-    return { ok: false, detail: 'metadata missing string "resource"' };
+  if (!isUrl(d.resource)) {
+    return {
+      ok: false,
+      detail: `metadata "resource" is not a valid http(s) URL (RFC 9728): ${JSON.stringify(d.resource)}`,
+    };
   }
   if (
     !Array.isArray(d.authorization_servers) ||
     d.authorization_servers.length === 0 ||
-    !d.authorization_servers.every((s) => typeof s === "string")
+    !d.authorization_servers.every((s) => isUrl(s))
   ) {
     return {
       ok: false,
-      detail: 'metadata missing non-empty string[] "authorization_servers"',
+      detail:
+        'metadata "authorization_servers" must be a non-empty http(s) URL[] (RFC 9728)',
     };
   }
   return {
@@ -215,6 +233,15 @@ export async function checkOAuth(
             "oauth.www_authenticate",
             "fail",
             'Bearer challenge missing "resource_metadata" parameter (RFC 9728 §5.1)'
+          )
+        );
+      } else if (!isUrl(params.resource_metadata)) {
+        results.push(
+          row(
+            client,
+            "oauth.www_authenticate",
+            "fail",
+            `Bearer challenge "resource_metadata" is not a valid http(s) URL (RFC 9728): ${JSON.stringify(params.resource_metadata)}`
           )
         );
       } else {

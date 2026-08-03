@@ -5,7 +5,7 @@
  * Tests run against the compiled fixture in `dist/` (build runs before test in
  * CI), so the spawn path matches exactly what a user gets from `npm run build`.
  */
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { createServer, type AddressInfo } from "node:http";
 import { fileURLToPath } from "node:url";
@@ -213,8 +213,8 @@ describe("oauth discovery-shape helpers", () => {
 });
 
 describe("v0.2.0 amendments", () => {
-  it("m4: VERSION reads the shipped version file (0.2.0)", () => {
-    expect(VERSION).toBe("0.2.0");
+  it("m4: VERSION reads the shipped VERSION file (single source of truth)", () => {
+    expect(VERSION).toBe(readFileSync(resolve(repoRoot, "VERSION"), "utf8").trim());
   });
 
   it("m4: `mcp-conform --version` prints the shipped version", () => {
@@ -223,7 +223,7 @@ describe("v0.2.0 amendments", () => {
       [resolve(repoRoot, "dist/cli.js"), "--version"],
       { encoding: "utf8" }
     );
-    expect(out.trim()).toBe("0.2.0");
+    expect(out.trim()).toBe(VERSION);
   });
 
   it("m5: on handshake failure the auth cell stays skip (not n/a)", async () => {
@@ -314,4 +314,113 @@ describe("v0.2.0 amendments", () => {
       server.close();
     }
   }, 30_000);
+});
+
+describe("v0.3.0 amendments", () => {
+  it("m9: malformed Protected Resource Metadata (non-URL resource/servers) fails instead of false-passing", async () => {
+    const fakeFetch = (async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.endsWith("/.well-known/oauth-protected-resource")) {
+        return new Response(
+          JSON.stringify({
+            resource: "garbage",
+            authorization_servers: ["not-a-url"],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        );
+      }
+      return new Response("unauthorized", {
+        status: 401,
+        headers: {
+          "www-authenticate": 'Bearer resource_metadata="garbage"',
+        },
+      });
+    }) as typeof fetch;
+
+    const rows = await checkOAuth("claude-code", {
+      baseUrl: "https://api.example.com/mcp",
+      fetchImpl: fakeFetch,
+    });
+    const meta = rows.find((r) => r.check_id === "oauth.protected_resource_metadata");
+    expect(meta?.status).toBe("fail");
+    const www = rows.find((r) => r.check_id === "oauth.www_authenticate");
+    expect(www?.status).toBe("fail");
+  });
+
+  it("m9: a well-formed discovery surface still passes (no false-negative)", async () => {
+    const fakeFetch = (async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.endsWith("/.well-known/oauth-protected-resource")) {
+        return new Response(
+          JSON.stringify({
+            resource: "https://api.example.com",
+            authorization_servers: ["https://auth.example.com"],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        );
+      }
+      return new Response("unauthorized", {
+        status: 401,
+        headers: {
+          "www-authenticate":
+            'Bearer resource_metadata="https://api.example.com/.well-known/oauth-protected-resource"',
+        },
+      });
+    }) as typeof fetch;
+    const rows = await checkOAuth("claude-code", {
+      baseUrl: "https://api.example.com/mcp",
+      fetchImpl: fakeFetch,
+    });
+    expect(rows.every((r) => r.status === "pass")).toBe(true);
+  });
+
+  it("m10: on handshake failure the behavior row set matches a green run (non-handshake checks = skip)", async () => {
+    const report = await run({
+      command: process.execPath,
+      args: ["-e", "process.exit(1)"],
+      timeoutMs: 5_000,
+    });
+    const cc = report.results.filter(
+      (r) => r.client === "claude-code" && r.axis === "behavior"
+    );
+    const ids = new Set(cc.map((r) => r.check_id));
+    for (const id of [
+      "handshake.initialize",
+      "handshake.server_info",
+      "handshake.capabilities",
+      "tools.list_schema",
+      "tools.call_roundtrip",
+    ]) {
+      expect(ids.has(id)).toBe(true);
+    }
+    expect(cc.find((r) => r.check_id === "handshake.initialize")?.status).toBe("fail");
+    for (const id of [
+      "handshake.server_info",
+      "handshake.capabilities",
+      "tools.list_schema",
+      "tools.call_roundtrip",
+    ]) {
+      expect(cc.find((r) => r.check_id === id)?.status).toBe("skip");
+    }
+    // The matrix cell verdict is still fail (rollup([fail, ...skip]) === "fail").
+    const view = buildMatrix(report);
+    const ccBehavior = view.cells.find(
+      (c) => c.client === "claude-code" && c.axis === "behavior"
+    );
+    expect(ccBehavior?.status).toBe("fail");
+    expect(isGreen(report)).toBe(false);
+  }, 30_000);
+
+  it("m11: Cursor/Gemini stub detail drops the stale '(v0.2)' promise", async () => {
+    for (const id of ["cursor", "gemini"] as const) {
+      const a = ADAPTERS.find((x) => x.id === id)!;
+      const rows = await a.run(
+        { client: id, serverCmd: "x", serverArgs: [] },
+        undefined
+      );
+      const detail = rows[0]!.detail;
+      expect(detail).not.toContain("(v0.2)");
+      expect(detail).toContain("deferred");
+    }
+  });
 });
