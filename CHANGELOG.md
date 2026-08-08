@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-08
+
+### Fixed
+- **echo-call-args false-fail** — the Claude Code adapter always passed the
+  echo fixture's `ECHO_CALL = {toolName:"echo", args:{message:"mcp-conform ping"}}`
+  to `checkTools`. When the server had no "echo" tool, `checkTools` fell back to
+  the first tool for the *name* but still sent the echo-specific `{message}` args
+  to that arbitrary tool, so any conformant server whose first tool requires
+  different args (e.g. a URL) returned `isError=true` or rejected on schema
+  validation, making `tools.call_roundtrip=fail` and the CLI exit 1 — a false
+  failure for a conformant server. `checkTools` now resolves the actual target
+  tool and, when the requested tool is not on the server, derives a minimal
+  valid `arguments` object from the fallback tool's own `inputSchema` required
+  fields (type-appropriate placeholders) instead of forcing echo args onto it.
+  And when even that synthesized call cannot succeed (the tool needs values the
+  harness cannot guess) it records `skip` rather than `fail`, since the failure
+  stems from the harness being unable to drive a real round-trip, not from the
+  server being non-conformant. A conformant server without an "echo" tool now
+  passes `tools.call_roundtrip`. (The optional `--tool`/`--args` CLI flags that
+  would let a user drive a real round-trip against a specific tool are deferred
+  to a follow-up `type:feature` milestone; the minimum fix ships without them.)
+- **OAuth HTTP probe timeout** — `checkOAuth`'s two `fetch` calls (Protected
+  Resource Metadata and `WWW-Authenticate`) had no `AbortSignal`/timeout; only
+  `client.connect` was wrapped in a timeout. A `--base-url` pointed at an HTTP
+  resource that accepts the TCP connection but never responds hung both fetches
+  indefinitely, stalling the CLI forever with no matrix and no exit — a direct
+  violation of the §3 "sub-30s total run" contract. Each `fetchImpl` in
+  `checkOAuth` is now wrapped in an `AbortController` + `setTimeout` (default
+  10s per probe; configurable via the new `OAuthProbeOptions.probeTimeoutMs`),
+  turning a non-responsive HTTP resource into a `fail` auth row
+  ("probe timed out after Nms") instead of an indefinite hang.
+
+### Changed
+- No new CLI flag, no new adapter, no new transport, no stack change. v0.4.0
+  deepens harness correctness (echo-arg fallback + OAuth probe timeout). License
+  line reconciled to Apache 2.0 (SuperMarioYL).
+
 ## [0.3.0] - 2026-08-03
 
 ### Fixed
@@ -93,7 +130,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bundled echo fixture server for a reproducible green-path demo.
 - Vitest suite covering the runner, spec checks, matrix roll-up, and badge output.
 
-[Unreleased]: https://github.com/SuperMarioYL/mcp-conform/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/SuperMarioYL/mcp-conform/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/SuperMarioYL/mcp-conform/releases/tag/v0.4.0
 [0.3.0]: https://github.com/SuperMarioYL/mcp-conform/releases/tag/v0.3.0
 [0.2.0]: https://github.com/SuperMarioYL/mcp-conform/releases/tag/v0.2.0
 [0.1.0]: https://github.com/SuperMarioYL/mcp-conform/releases/tag/v0.1.0

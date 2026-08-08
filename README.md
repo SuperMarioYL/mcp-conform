@@ -129,11 +129,16 @@ npx mcp-conform run node ./my-mcp-server.js --base-url https://api.example.com/m
 - [x] **m3 · 标准 fixture** — 内置 echo fixture，一条命令复现绿矩阵。
 - [x] **v0.2 · 活体 OAuth discovery 探测** — `--base-url <url>` 让 auth 列从 `skip` 变成真实的 pass/fail（v0.1 写了校验但 CLI 从未把 base URL 接进去）。
 - [x] **v0.2 · 版本单一来源** — `clientInfo.version` 与 `--version` 统一从 `VERSION` 文件读取，不再硬编码。
+- [x] **v0.3 · OAuth discovery URL 形状校验** — `resource` / `authorization_servers` / `resource_metadata` 现按 RFC 9728 校验为 http(s) URL，畸形元数据不再误判为 pass。
+- [x] **v0.3 · 失败时行为行集稳定** — 握手失败时补齐 `skip` 行，使 `--report` 的行为行集与绿矩阵一致（便于程序化 diff）。
+- [x] **v0.3 · 过期 stub 版本标签** — Cursor / Gemini stub 去掉「(v0.2)」的过期承诺。
+- [x] **v0.4 · echo 参数回退修正** — 当 server 无 "echo" 工具时，不再把 echo 专用 `{message}` 参数强塞给任意回退工具，而是从目标工具 `inputSchema` 派生最小合法参数；合成调用仍失败则记 `skip` 而非误报 `fail`。
+- [x] **v0.4 · OAuth 探测超时** — `checkOAuth` 的每次 fetch 包上 `AbortController` + 超时，挂起的 HTTP 资源变成 fail（"probe timed out"）而非永久卡死 CLI。
 - [ ] **更深的 OAuth** — 在 discovery/shape 之上走端到端 token grant。
 - [ ] **真实 Cursor / Gemini 适配器** — MCP 协议在 stdio 上是 client 无关的，所以「真实」Cursor 适配器会和 Claude Code 跑同一批校验、只多一列而非多一项检查；待出现「客户端在协议层有差异」的真实需求再做。
 
 ## 许可证
 
-[MIT](./LICENSE)。欢迎提 issue 或 PR：发现某个 server 在某客户端下行为不一致，或想加一个新客户端适配器，开个 issue 描述复现命令即可。
+[Apache-2.0](./LICENSE)。欢迎提 issue 或 PR：发现某个 server 在某客户端下行为不一致，或想加一个新客户端适配器，开个 issue 描述复现命令即可。
 
-<p align="center"><sub><a href="./LICENSE">MIT</a> © 2026 SuperMarioYL</sub></p>
+<p align="center"><sub><a href="./LICENSE">Apache-2.0</a> © 2026 SuperMarioYL</sub></p>

@@ -11,6 +11,7 @@ import { createServer, type AddressInfo } from "node:http";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { run, isGreen, ADAPTERS } from "../src/runner.js";
 import { buildMatrix, rollup } from "../src/report/matrix.js";
 import {
@@ -19,9 +20,10 @@ import {
   buildBadgeSvg,
 } from "../src/report/badge.js";
 import {
+  checkTools,
+  checkOAuth,
   parseWwwAuthenticate,
   validateProtectedResourceMetadata,
-  checkOAuth,
 } from "../src/spec/index.js";
 import { VERSION } from "../src/version.js";
 
@@ -422,5 +424,109 @@ describe("v0.3.0 amendments", () => {
       expect(detail).not.toContain("(v0.2)");
       expect(detail).toContain("deferred");
     }
+  });
+});
+
+describe("v0.4.0 amendments", () => {
+  it("m12: a server whose first tool needs non-message args still passes tools.call_roundtrip (no echo tool)", async () => {
+    // A conformant server whose ONLY tool requires a `url` argument — NOT the
+    // echo fixture's `message`. Before the fix the harness sent echo-specific
+    // {message:"mcp-conform ping"} to this arbitrary fallback tool and
+    // false-failed it; now it derives a minimal valid {url} from the tool's
+    // own inputSchema and the round-trip passes.
+    const toolList = [
+      {
+        name: "fetch_url",
+        description: "fetch a url",
+        inputSchema: {
+          type: "object",
+          properties: { url: { type: "string" } },
+          required: ["url"],
+        },
+      },
+    ];
+    const calls: Array<{ name: string; args: Record<string, unknown> }> = [];
+    const fakeClient = {
+      listTools: async () => ({ tools: toolList }),
+      callTool: async (req: {
+        name: string;
+        arguments?: Record<string, unknown>;
+      }) => {
+        calls.push({ name: req.name, args: req.arguments ?? {} });
+        return { content: [{ type: "text", text: "fetched" }] };
+      },
+    } as unknown as Client;
+
+    const rows = await checkTools("claude-code", fakeClient, {
+      toolName: "echo",
+      args: { message: "mcp-conform ping" },
+    });
+
+    const listRow = rows.find((r) => r.check_id === "tools.list_schema");
+    expect(listRow?.status).toBe("pass");
+    const roundtrip = rows.find((r) => r.check_id === "tools.call_roundtrip");
+    expect(roundtrip?.status).toBe("pass");
+    // The fallback tool was the one actually called, and NOT with the echo
+    // {message} args — it was called with a {url} placeholder derived from
+    // the tool's own inputSchema required fields.
+    expect(calls[0]!.name).toBe("fetch_url");
+    expect(calls[0]!.args).toEqual({ url: "mcp-conform-probe" });
+    expect(calls[0]!.args).not.toHaveProperty("message");
+  });
+
+  it("m12: a non-echo tool that rejects harness-synthesized args skips (does not false-fail) tools.call_roundtrip", async () => {
+    // A conformant server whose tool requires a value the harness cannot guess
+    // (e.g. a URL it validates). It rejects the synthesized placeholder with
+    // isError=true. The harness must not hard-fail a conformant server here —
+    // the failure stems from the harness's echo default hitting a non-echo
+    // tool, not from non-conformance — so it records `skip`.
+    const toolList = [
+      {
+        name: "fetch_url",
+        inputSchema: {
+          type: "object",
+          properties: { url: { type: "string" } },
+          required: ["url"],
+        },
+      },
+    ];
+    const fakeClient = {
+      listTools: async () => ({ tools: toolList }),
+      callTool: async () => ({
+        content: [{ type: "text", text: "invalid url" }],
+        isError: true,
+      }),
+    } as unknown as Client;
+
+    const rows = await checkTools("claude-code", fakeClient, {
+      toolName: "echo",
+      args: { message: "mcp-conform ping" },
+    });
+    const roundtrip = rows.find((r) => r.check_id === "tools.call_roundtrip");
+    expect(roundtrip?.status).toBe("skip");
+    expect(roundtrip?.detail).toContain("isError=true");
+  });
+
+  it("m13: a hanging HTTP resource yields a fail auth row (probe timed out) instead of stalling", async () => {
+    // A "hanging socket": the fetch accepts the call but never responds (the
+    // m13 failure mode). Before the fix both probes hung indefinitely, stalling
+    // the CLI with no matrix and no exit. Now each probe is bounded by an
+    // AbortController + setTimeout and turns into a fail "probe timed out" row.
+    const hangingFetch = (() =>
+      new Promise<Response>(() => {
+        /* never resolves, never rejects — a pending TCP socket */
+      })) as typeof fetch;
+
+    const rows = await checkOAuth("claude-code", {
+      baseUrl: "https://api.example.com/mcp",
+      fetchImpl: hangingFetch,
+      probeTimeoutMs: 100,
+    });
+    expect(rows.length).toBe(2);
+    expect(rows.every((r) => r.status === "fail")).toBe(true);
+    expect(rows[0]!.detail).toContain("timed out");
+    expect(rows[1]!.detail).toContain("timed out");
+    expect(rows[0]!.check_id).toBe("oauth.protected_resource_metadata");
+    expect(rows[1]!.check_id).toBe("oauth.www_authenticate");
   });
 });

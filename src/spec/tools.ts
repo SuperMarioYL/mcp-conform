@@ -104,31 +104,53 @@ export async function checkTools(
     return results;
   }
 
-  const target =
-    (callArg.toolName && tools.find((t) => t.name === callArg.toolName)?.name) ||
-    tools[0]!.name;
-  const args = callArg.args ?? {};
+  // Resolve the target tool. Prefer the adapter-requested toolName; if it is
+  // not advertised by this server, fall back to the first tool. Critically,
+  // when we fall back we must NOT force the requested tool's args (e.g. the
+  // echo fixture's {message}) onto an unrelated tool — that would false-fail
+  // any conformant server whose first tool needs different args (e.g. a URL).
+  // Instead we derive a minimal valid arguments object from the fallback
+  // tool's OWN inputSchema required fields. And if even that synthesized call
+  // does not pass, we record `skip` rather than `fail`: the failure stems from
+  // the harness being unable to drive a real round-trip (no requested tool on
+  // the server, no --tool/--args override — deferred to a follow-up feature),
+  // NOT from the server being non-conformant. A conformant server that accepts
+  // the synthesized args still reaches `pass`.
+  const requestedTool = callArg.toolName
+    ? tools.find((t) => t.name === callArg.toolName)
+    : undefined;
+  const targetTool = requestedTool ?? tools[0]!;
+  const target = targetTool.name;
+  /** True when the adapter's requested tool is not on this server. */
+  const isFallback = !requestedTool;
+  const args = isFallback
+    ? deriveMinimalArgs(targetTool.inputSchema)
+    : callArg.args ?? {};
+  const fallbackNote =
+    "cannot verify without an explicit --tool/--args (deferred)";
 
   try {
     const callResult = await mcpClient.callTool({ name: target, arguments: args });
     const content = (callResult as { content?: unknown }).content;
     const parsed = z.array(ContentBlock).safeParse(content);
     if (!parsed.success) {
+      const detail = `tools/call "${target}" returned no valid content array: ${parsed.error.issues[0]?.message ?? "unknown"}`;
       results.push(
         row(
           client,
           "tools.call_roundtrip",
-          "fail",
-          `tools/call "${target}" returned no valid content array: ${parsed.error.issues[0]?.message ?? "unknown"}`
+          isFallback ? "skip" : "fail",
+          isFallback ? `${detail} (${fallbackNote})` : detail
         )
       );
     } else if ((callResult as { isError?: boolean }).isError) {
+      const detail = `tools/call "${target}" responded with isError=true${isFallback ? " using harness-synthesized args" : ""}`;
       results.push(
         row(
           client,
           "tools.call_roundtrip",
-          "fail",
-          `tools/call "${target}" responded with isError=true`
+          isFallback ? "skip" : "fail",
+          isFallback ? `${detail} (${fallbackNote})` : detail
         )
       );
     } else {
@@ -142,17 +164,63 @@ export async function checkTools(
       );
     }
   } catch (err) {
+    const detail = `tools/call "${target}" threw: ${errMessage(err)}`;
     results.push(
       row(
         client,
         "tools.call_roundtrip",
-        "fail",
-        `tools/call "${target}" threw: ${errMessage(err)}`
+        isFallback ? "skip" : "fail",
+        isFallback ? `${detail} (${fallbackNote})` : detail
       )
     );
   }
 
   return results;
+}
+
+/**
+ * Derive a minimal valid arguments object from a tool's `inputSchema`, so a
+ * fallback `tools/call` (the adapter's requested tool is not on this server)
+ * does not force the requested tool's args onto an unrelated tool. For each
+ * `required` property a type-appropriate placeholder is supplied; a property
+ * with a `default` uses it; unknown types fall back to `null`. A schema with
+ * no `required` fields yields `{}` — a conformant server must accept that.
+ */
+function deriveMinimalArgs(inputSchema: unknown): Record<string, unknown> {
+  const schema = (inputSchema ?? {}) as Record<string, unknown>;
+  const required = Array.isArray(schema.required) ? schema.required : [];
+  const properties =
+    schema.properties && typeof schema.properties === "object"
+      ? (schema.properties as Record<string, Record<string, unknown>>)
+      : {};
+  const args: Record<string, unknown> = {};
+  for (const field of required) {
+    if (typeof field !== "string") continue;
+    const prop = properties[field];
+    if (prop && "default" in prop && prop.default !== undefined) {
+      args[field] = prop.default;
+    } else {
+      args[field] = placeholderFor(prop);
+    }
+  }
+  return args;
+}
+
+/** Type-appropriate placeholder for a synthesized argument value. */
+function placeholderFor(prop: unknown): unknown {
+  if (!prop || typeof prop !== "object") return null;
+  const type = (prop as Record<string, unknown>).type;
+  switch (type) {
+    case "string":
+      return "mcp-conform-probe";
+    case "integer":
+    case "number":
+      return 0;
+    case "boolean":
+      return false;
+    default:
+      return null;
+  }
 }
 
 function errMessage(err: unknown): string {

@@ -1,0 +1,75 @@
+verdict: PASS
+m12_met: true
+m13_met: true
+tests_adequate: true
+scope_clean: true
+no_regression: true
+build:
+  version: 0.4.0
+  tests_pass: 35
+  tests_prev: 32
+  tsc_clean: true
+  diff_files:
+    - CHANGELOG.md
+    - README.en.md
+    - README.md
+    - VERSION
+    - package.json
+    - src/spec/oauth.ts
+    - src/spec/tools.ts
+    - test/runner.test.ts
+  untracked_files: none
+findings:
+  - severity: low
+    issue: >
+      m13 — the per-probe timeout wraps both fetchImpl calls (oauth.ts:212 metadata,
+      oauth.ts:256 WWW-Authenticate) via fetchWithTimeout, but the response BODY parse
+      `await res.json()` (oauth.ts:228) sits outside the timeout. A malicious server
+      that returns HTTP 200 + headers then never sends the body could re-introduce the
+      exact "CLI stalls forever, no matrix, no exit" symptom via a different trigger.
+      The documented m13 failure mode ("accepts the TCP connection but never responds",
+      i.e. fetch never resolves) IS genuinely fixed and the test proves it; this is a
+      hardening note for a separate, undocumented failure mode, not a scope failure.
+  - severity: low
+    issue: >
+      m12 — placeholderFor returns null for unknown/complex types (object/array
+      schemas), so a real server whose first required arg is a complex object would
+      derive {field:null}, likely fail schema validation, and skip (yellow) rather
+      than pass. This is within the milestone's explicitly-accepted trade-off ("do not
+      hard-fail when the failure stems from the harness echo default hitting a
+      non-echo tool") and the skip safety net catches it honestly; a type-aware
+      placeholder for object/array would be a future hardening.
+notes: >
+  Evaluated as a fresh adversarial session with no memory of implementation. Both
+  done-criteria are genuinely met, not leniently judged.
+  m12: src/spec/tools.ts checkTools now resolves requestedTool via tools.find; when
+  the adapter's requested toolName ("echo") is not on the server, isFallback=true and
+  args come from deriveMinimalArgs(targetTool.inputSchema) — NOT the echo {message}.
+  deriveMinimalArgs reads the schema `required` array, supplies type-appropriate
+  placeholders (string->"mcp-conform-probe", number/integer->0, boolean->false,
+  unknown->null), honors a property `default`, and yields {} when there are no
+  required fields. A conformant server whose first tool requires a `url` now reaches
+  tools.call_roundtrip=pass (traced + asserted in test 1). The skip safety net fires
+  ONLY when isFallback=true (requested tool absent); when the requested tool IS
+  present, a non-pass is still a hard fail — so it does not mask real conformance
+  failures of a targeted tool. Sound.
+  m13: fetchWithTimeout wraps each fetchImpl in AbortController + setTimeout, races
+  fetch vs a timeout promise, calls controller.abort() on expiry, and .catch-guards
+  the fetch so a late AbortError is not unhandled. Both probes (Protected Resource
+  Metadata + WWW-Authenticate) are wrapped. Default probeTimeoutMs=10000; two probes
+  bound worst case at ~20s, under the section-3 sub-30s contract. A hanging fetch
+  yields fail rows "metadata probe timed out after 10000ms" / "WWW-Authenticate probe
+  timed out after 10000ms" (contain "probe timed out after Nms"). Met.
+  Tests: the 3 new tests are real assertions, not stubs. m12 test 1 asserts
+  roundtrip=pass AND calls[0].name=="fetch_url" AND calls[0].args=={url:"mcp-conform-probe"}
+  AND no "message" key — directly proving echo args are not forced onto the fallback.
+  m12 test 2 asserts skip + "isError=true" detail. m13 test uses a never-resolving
+  fetch + probeTimeoutMs:100, asserts 2 fail rows containing "timed out" with correct
+  check_ids.
+  Scope: --tool/--args correctly DEFERRED (cli.ts unchanged; fallbackNote string
+  references the deferral). No new adapters/transports/features. Diff is exactly the
+  8 expected files; claude-code.ts/cli.ts/runner.ts untouched — the fix is correctly
+  localized to tools.ts/oauth.ts where the bugs live (the plan listed those three as
+  target_files, but target_files is a guide; the actual fix did not require editing
+  them, which is fine and tighter than the plan).
+  No regression: 35/35 green (was 32, +3), tsc --noEmit exit 0.

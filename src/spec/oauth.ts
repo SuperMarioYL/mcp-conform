@@ -38,6 +38,15 @@ export interface OAuthProbeOptions {
   baseUrl?: string;
   /** Injectable fetch for testing; defaults to global `fetch`. */
   fetchImpl?: typeof fetch;
+  /**
+   * Per-probe timeout in milliseconds. Each `fetchImpl` call is wrapped in an
+   * `AbortController` + `setTimeout` so a non-responsive HTTP resource (one
+   * that accepts the TCP connection but never responds) is turned into a `fail`
+   * row ("probe timed out after Nms") instead of stalling the CLI forever —
+   * the §3 "sub-30s total run" contract. Defaults to 10000 (two probes bound
+   * the worst case at ~20s, under the 30s contract).
+   */
+  probeTimeoutMs?: number;
 }
 
 /** Parse a WWW-Authenticate Bearer challenge into its parameters. */
@@ -71,6 +80,51 @@ function isUrl(s: unknown): s is string {
   } catch {
     return false;
   }
+}
+
+/**
+ * Thrown when an OAuth HTTP probe exceeds its per-probe timeout. The §3
+ * "sub-30s total run" contract requires that a non-responsive HTTP resource
+ * (one that accepts the TCP connection but never responds) becomes a `fail`
+ * auth row instead of an indefinite CLI stall. Only `client.connect` was
+ * previously wrapped in a timeout; the two `fetchImpl` calls in `checkOAuth`
+ * were not, so a hanging resource stalled forever with no matrix and no exit.
+ */
+class ProbeTimeoutError extends Error {
+  constructor(ms: number) {
+    super(`probe timed out after ${ms}ms`);
+    this.name = "ProbeTimeoutError";
+  }
+}
+
+/**
+ * Run `fetchImpl(url)` bounded by a per-probe timeout. A single timer both
+ * aborts the in-flight request (so a cooperative `fetch` releases its socket)
+ * and rejects the race with a {@link ProbeTimeoutError}. The fetch promise is
+ * also `.catch`-guarded so an abort that fires after the race has settled on
+ * the timeout does not surface as an unhandled rejection (and a non-cooperative
+ * fetch that ignores the signal is still bounded by the race).
+ */
+function fetchWithTimeout(
+  fetchImpl: typeof fetch,
+  url: string,
+  init: RequestInit,
+  probeTimeoutMs: number
+): Promise<Response> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new ProbeTimeoutError(probeTimeoutMs));
+    }, probeTimeoutMs);
+  });
+  const fetchP = fetchImpl(url, { ...init, signal: controller.signal });
+  // Swallow the eventual AbortError once the race has settled on the timeout.
+  fetchP.catch(() => {});
+  return Promise.race([fetchP, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
 }
 
 /** Validate the SHAPE of a Protected Resource Metadata document (RFC 9728). */
@@ -133,6 +187,7 @@ export async function checkOAuth(
   }
 
   const fetchImpl = opts.fetchImpl ?? fetch;
+  const probeTimeoutMs = opts.probeTimeoutMs ?? 10_000;
   const results: CheckResult[] = [];
 
   // Parse the HTTP origin up front. A malformed base URL (e.g. missing scheme)
@@ -154,9 +209,12 @@ export async function checkOAuth(
   // --- 1. Protected Resource Metadata ---
   const metadataUrl = `${origin}/.well-known/oauth-protected-resource`;
   try {
-    const res = await fetchImpl(metadataUrl, {
-      headers: { accept: "application/json" },
-    });
+    const res = await fetchWithTimeout(
+      fetchImpl,
+      metadataUrl,
+      { headers: { accept: "application/json" } },
+      probeTimeoutMs
+    );
     if (!res.ok) {
       results.push(
         row(
@@ -186,14 +244,21 @@ export async function checkOAuth(
         client,
         "oauth.protected_resource_metadata",
         "fail",
-        `metadata probe threw: ${errMessage(err)}`
+        err instanceof ProbeTimeoutError
+          ? `metadata ${err.message}`
+          : `metadata probe threw: ${errMessage(err)}`
       )
     );
   }
 
   // --- 2. WWW-Authenticate challenge shape on a 401 ---
   try {
-    const res = await fetchImpl(baseUrl, { headers: { accept: "application/json" } });
+    const res = await fetchWithTimeout(
+      fetchImpl,
+      baseUrl,
+      { headers: { accept: "application/json" } },
+      probeTimeoutMs
+    );
     const challenge = res.headers.get("www-authenticate");
     if (res.status !== 401) {
       results.push(
@@ -261,7 +326,9 @@ export async function checkOAuth(
         client,
         "oauth.www_authenticate",
         "fail",
-        `WWW-Authenticate probe threw: ${errMessage(err)}`
+        err instanceof ProbeTimeoutError
+          ? `WWW-Authenticate ${err.message}`
+          : `WWW-Authenticate probe threw: ${errMessage(err)}`
       )
     );
   }

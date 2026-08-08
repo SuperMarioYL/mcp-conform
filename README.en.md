@@ -9,7 +9,7 @@
 <p><sub>mcp-conform is the neutral cross-client <b>MCP</b> conformance harness that emits a per-client behavior + Zero-Touch OAuth parity matrix from a single command.</sub></p>
 
 <p align="center">
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License: Apache-2.0"></a>
   <a href="https://github.com/SuperMarioYL/mcp-conform/releases"><img src="https://img.shields.io/github/v/release/SuperMarioYL/mcp-conform?color=0071E3" alt="Latest release"></a>
   <a href="https://github.com/SuperMarioYL/mcp-conform/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/SuperMarioYL/mcp-conform/ci.yml?branch=main&label=ci" alt="CI status"></a>
   <img src="https://img.shields.io/badge/node-%E2%89%A520-339933?logo=node.js&logoColor=white" alt="Node >= 20">
@@ -130,11 +130,16 @@ It wins outright on *breadth* — a curated README will always list more servers
 - [x] **m3 · canonical fixture** — bundled echo fixture, green matrix reproducible in one command.
 - [x] **v0.2 · live OAuth discovery probe** — `--base-url <url>` turns the auth cell from `skip` into a real pass/fail (v0.1 shipped the checks but the CLI never wired a base URL into them).
 - [x] **v0.2 · single-source version** — `clientInfo.version` and `--version` both read the `VERSION` file instead of a hardcoded literal.
+- [x] **v0.3 · OAuth discovery URL-shape validation** — `resource`, `authorization_servers`, and the `resource_metadata` challenge param are now validated as http(s) URLs per RFC 9728, so malformed metadata no longer false-passes.
+- [x] **v0.3 · stable behavior row set on failure** — on a failed handshake the behavior axis now emits `skip` rows so the `--report` row set matches a green run (stable for programmatic diffing).
+- [x] **v0.3 · stale stub version labels** — the Cursor/Gemini stubs drop the stale "(v0.2)" promise.
+- [x] **v0.4 · echo-arg fallback fix** — when the server has no "echo" tool, the harness no longer forces echo-specific `{message}` args onto an arbitrary fallback tool; it derives minimal args from the target tool's `inputSchema` and records `skip` (not a false `fail`) when a synthesized call still cannot succeed.
+- [x] **v0.4 · OAuth probe timeout** — each `checkOAuth` fetch is wrapped in an `AbortController` + timeout, so a hanging HTTP resource becomes a `fail` ("probe timed out") instead of stalling the CLI.
 - [ ] **Deeper OAuth** — go beyond discovery/shape to an end-to-end token grant.
 - [ ] **Real Cursor / Gemini adapters** — the MCP protocol is client-agnostic over stdio, so a "real" Cursor adapter would run the same checks as Claude Code and only add a column, not a check; deferred until a real client-level protocol divergence surfaces.
 
 ## License
 
-[MIT](./LICENSE). Issues and PRs welcome: found a server that behaves differently across clients, or want to add a new client adapter? Open an issue with the repro command.
+[Apache-2.0](./LICENSE). Issues and PRs welcome: found a server that behaves differently across clients, or want to add a new client adapter? Open an issue with the repro command.
 
-<p align="center"><sub><a href="./LICENSE">MIT</a> © 2026 SuperMarioYL</sub></p>
+<p align="center"><sub><a href="./LICENSE">Apache-2.0</a> © 2026 SuperMarioYL</sub></p>
