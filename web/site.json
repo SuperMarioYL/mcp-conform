@@ -40,12 +40,12 @@
         "en": "One command, your own server"
       },
       "body": {
-        "zh": "不用搭测试脚手架，也不用改你的 server。告诉它「你平时怎么启动 server」，它就在你本机把 server 真正跑起来、挨个客户端对照检查。内置一个示例 server，三条命令复现第一张全绿矩阵。",
-        "en": "No test harness to set up, no changes to your server. Tell it how you normally start your server and it actually runs it on your machine, checking it against each client. Ships with a sample server — three commands to your first all-green matrix."
+        "zh": "不用搭测试脚手架，也不用改你的 server。告诉它「你平时怎么启动 server」，它就在你本机把 server 真正跑起来、挨个客户端对照检查。它不预设你的 server 一定有某个特定工具——按你 server 自己的工具如实探，所以一个合规的 server 就算没有示例里那种工具，也会判「过」而非被冤枉成「不过」。内置示例 server，三条命令复现第一张全绿矩阵。",
+        "en": "No test harness to set up, no changes to your server. Tell it how you normally start your server and it actually runs it on your machine, checking it against each client. It doesn't assume your server has any particular tool — it drives whatever your server actually exposes, so a conformant server without the sample's tool still passes instead of being falsely marked as failing. Ships with a sample server — three commands to your first all-green matrix."
       },
       "chips": [
         "› 不用改你的 server",
-        "› 内置示例 server"
+        "› 不预设你的工具长什么样"
       ]
     },
     {
@@ -68,12 +68,12 @@
         "en": "Is the auth right? Run once and know"
       },
       "body": {
-        "zh": "不用再猜你的 server 鉴权是不是按规范来的。给它一个线上地址，它真的去探一下你的鉴权是不是按各客户端期待的方式接好的——从「跳过」变成实打实的过 / 不过。",
-        "en": "Stop guessing whether your server's auth follows the spec. Give it a live URL and it actually probes whether your auth is wired the way clients expect — turning a \"skipped\" into a real pass or fail."
+        "zh": "不用再猜你的 server 鉴权是不是按规范来的。给它一个线上地址，它真的去探一下你的鉴权是不是按各客户端期待的方式接好的——从「跳过」变成实打实的过 / 不过。就算那个地址连得上却迟迟不回，它也会在几秒内判「探测超时、不过」，而不是让你的终端卡死——一次跑完，永远不超过 30 秒。",
+        "en": "Stop guessing whether your server's auth follows the spec. Give it a live URL and it actually probes whether your auth is wired the way clients expect — turning a \"skipped\" into a real pass or fail. And if that URL connects but never answers, it calls it a timed-out fail within seconds instead of freezing your terminal — every run finishes in well under 30 seconds."
       },
       "chips": [
         "› 给个地址，真跑一遍",
-        "› 不再是「跳过」"
+        "› 卡住也判得出 · 30 秒内收尾"
       ]
     },
     {
@@ -118,5 +118,10 @@
       "zh": "中立的跨客户端 MCP 一致性，一条命令搞定",
       "en": "Neutral cross-client MCP parity, in one command"
     }
+  },
+  "meta": {
+    "content_version": "v0.4.0",
+    "generated_at": "2026-08-08T05:19:25Z",
+    "web_factory_ref": "v1.1"
   }
 }
