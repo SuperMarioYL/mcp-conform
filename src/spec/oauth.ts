@@ -127,6 +127,66 @@ function fetchWithTimeout(
   });
 }
 
+/**
+ * Fetch a JSON body bounded by the per-probe timeout — the timeout covers the
+ * `res.json()` body read, not just the response headers.
+ *
+ * {@link fetchWithTimeout} clears its AbortController timer in `.finally` as
+ * soon as the response headers arrive (the race settles on the fetch promise),
+ * which leaves the caller's subsequent `await res.json()` outside any timeout.
+ * A server that returns 200 + `content-type: application/json` then never
+ * completes the body hangs `res.json()` indefinitely — reopening the m13
+ * "hanging resource stalls the CLI" failure the per-probe timeout was meant to
+ * close. This helper keeps the AbortController + timer alive across the body
+ * read: the timer is only cleared in `.finally` once the try block (including
+ * `res.json()`) settles, so a slow-dripping body is aborted and surfaced as a
+ * {@link ProbeTimeoutError} ("probe timed out after Nms") instead of a stall.
+ */
+async function fetchJsonWithTimeout(
+  fetchImpl: typeof fetch,
+  url: string,
+  init: RequestInit,
+  probeTimeoutMs: number
+): Promise<{ status: number; ok: boolean; doc?: unknown }> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let timedOut = false;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+      reject(new ProbeTimeoutError(probeTimeoutMs));
+    }, probeTimeoutMs);
+  });
+  // Swallow each promise's eventual late rejection once the other wins the
+  // race: a fetch that loses to the timeout still rejects with an AbortError,
+  // and the timeout that loses to fast headers still rejects — neither should
+  // surface as an unhandled rejection. The abort's effect on the body read
+  // surfaces via res.json() rejecting below.
+  const fetchP = fetchImpl(url, { ...init, signal: controller.signal });
+  fetchP.catch(() => {});
+  timeout.catch(() => {});
+  try {
+    const res = await Promise.race([fetchP, timeout]);
+    if (!res.ok) {
+      return { status: res.status, ok: false };
+    }
+    // The timer has NOT been cleared yet — the body read is still bounded by
+    // the per-probe timeout. A slow-dripping body aborts here and, because
+    // `timedOut` was set, is re-thrown as a ProbeTimeoutError.
+    let doc: unknown;
+    try {
+      doc = await res.json();
+    } catch {
+      if (timedOut) throw new ProbeTimeoutError(probeTimeoutMs);
+      doc = undefined;
+    }
+    return { status: res.status, ok: true, doc };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 /** Validate the SHAPE of a Protected Resource Metadata document (RFC 9728). */
 export function validateProtectedResourceMetadata(doc: unknown): {
   ok: boolean;
@@ -142,20 +202,34 @@ export function validateProtectedResourceMetadata(doc: unknown): {
       detail: `metadata "resource" is not a valid http(s) URL (RFC 9728): ${JSON.stringify(d.resource)}`,
     };
   }
-  if (
-    !Array.isArray(d.authorization_servers) ||
-    d.authorization_servers.length === 0 ||
-    !d.authorization_servers.every((s) => isUrl(s))
-  ) {
-    return {
-      ok: false,
-      detail:
-        'metadata "authorization_servers" must be a non-empty http(s) URL[] (RFC 9728)',
-    };
+  // RFC 9728 §2.1: `authorization_servers` is OPTIONAL — it MAY be omitted
+  // entirely when the set of authorization servers is not enumerable. Only
+  // validate it when present; an absent field is conformant (`resource` is the
+  // only REQUIRED member). A present-but-non-array / empty / non-URL value is
+  // still malformed discovery metadata and must fail, not false-pass.
+  const authServers = d.authorization_servers;
+  if (authServers !== undefined) {
+    if (
+      !Array.isArray(authServers) ||
+      authServers.length === 0 ||
+      !authServers.every((s) => isUrl(s))
+    ) {
+      return {
+        ok: false,
+        detail:
+          'metadata "authorization_servers" must be a non-empty http(s) URL[] (RFC 9728)',
+      };
+    }
   }
+  // Guard the success-detail: when `authorization_servers` is absent the old
+  // `d.authorization_servers.length` access threw once the field became
+  // optional. Array.isArray distinguishes "validated array present" (count)
+  // from "absent" (no count) without touching .length on a non-array.
   return {
     ok: true,
-    detail: `resource="${d.resource}", ${d.authorization_servers.length} authorization_server(s)`,
+    detail: Array.isArray(authServers)
+      ? `resource="${d.resource}", ${authServers.length} authorization_server(s)`
+      : `resource="${d.resource}", no authorization_servers (RFC 9728 OPTIONAL)`,
   };
 }
 
@@ -209,24 +283,26 @@ export async function checkOAuth(
   // --- 1. Protected Resource Metadata ---
   const metadataUrl = `${origin}/.well-known/oauth-protected-resource`;
   try {
-    const res = await fetchWithTimeout(
+    // fetchJsonWithTimeout bounds BOTH the response headers AND the res.json()
+    // body read by the per-probe timeout — a slow-dripping 200 is aborted and
+    // surfaced as a "probe timed out" fail instead of stalling the CLI.
+    const result = await fetchJsonWithTimeout(
       fetchImpl,
       metadataUrl,
       { headers: { accept: "application/json" } },
       probeTimeoutMs
     );
-    if (!res.ok) {
+    if (!result.ok) {
       results.push(
         row(
           client,
           "oauth.protected_resource_metadata",
           "fail",
-          `GET ${metadataUrl} -> HTTP ${res.status} (expected 200 with metadata)`
+          `GET ${metadataUrl} -> HTTP ${result.status} (expected 200 with metadata)`
         )
       );
     } else {
-      const doc = await res.json().catch(() => undefined);
-      const check = validateProtectedResourceMetadata(doc);
+      const check = validateProtectedResourceMetadata(result.doc);
       results.push(
         row(
           client,

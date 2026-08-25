@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-25
+
+### Fixed
+- **RFC 9728 `authorization_servers` false-fail** —
+  `validateProtectedResourceMetadata` required the `authorization_servers`
+  field as a non-empty `http(s)` URL[], but RFC 9728 §2.1 marks it OPTIONAL —
+  it may be omitted entirely when the set of authorization servers is not
+  enumerable. Conformant metadata like `{"resource": "https://api.example.com"}`
+  (no `authorization_servers`) therefore false-failed with
+  `oauth.protected_resource_metadata=fail` — a conformance tool rejecting a
+  valid RFC 9728 document. `authorization_servers` is now treated as optional:
+  when absent the document passes (`resource` is the only REQUIRED member);
+  when present it is still validated as a non-empty `http(s)` URL[]. The
+  success-detail string that did `d.authorization_servers.length` is guarded so
+  it no longer throws once the field may be absent. (m14)
+- **OAuth metadata probe body-read timeout** — `fetchWithTimeout` cleared its
+  `AbortController` timer in `.finally` as soon as the response headers arrived
+  (the race settled on the fetch promise), so the subsequent `await res.json()`
+  in the Protected Resource Metadata probe read the body OUTSIDE any timeout.
+  A server that returned `200` + `content-type: application/json` then never
+  completed the body hung `res.json()` far beyond the per-probe budget,
+  reopening the m13 "hanging resource stalls the CLI" failure the per-probe
+  timeout was meant to close. The metadata probe now uses `fetchJsonWithTimeout`,
+  which keeps the `AbortController` + timer alive across the body read (the timer
+  is only cleared once `res.json()` settles), so a slow-dripping body is aborted
+  and surfaced as a `fail` row ("metadata probe timed out after Nms") instead of
+  a multi-minute stall. The `WWW-Authenticate` probe, which reads only headers,
+  is unchanged. (m15)
+
+### Notes
+- v0.5.0 is a cold-start bug-hunt release: no new feature scope. Since the
+  2026-08-08 v0.4.0 ship there has been no post-ship code or community activity
+  (0 open issues / 0 PRs / 0 forks / 0 patches); the two verified
+  `src/spec/oauth.ts` fixes above are the entirety of the release.
+
 ## [0.4.0] - 2026-08-08
 
 ### Fixed
