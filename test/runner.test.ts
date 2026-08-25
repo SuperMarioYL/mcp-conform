@@ -172,11 +172,14 @@ describe("oauth discovery-shape helpers", () => {
     expect(ok.ok).toBe(true);
   });
 
-  it("rejects metadata missing authorization_servers", () => {
-    const bad = validateProtectedResourceMetadata({
+  it("passes metadata that omits the OPTIONAL authorization_servers field (RFC 9728)", () => {
+    // RFC 9728 §2.1 marks authorization_servers OPTIONAL — it may be omitted
+    // entirely when the set of authorization servers is not enumerable. Before
+    // v0.5.0 this false-failed conformant metadata like {resource: "..."}.
+    const ok = validateProtectedResourceMetadata({
       resource: "https://api.example.com",
     });
-    expect(bad.ok).toBe(false);
+    expect(ok.ok).toBe(true);
   });
 
   it("skips auth checks when no HTTP base URL is provided (stdio)", async () => {
@@ -528,5 +531,134 @@ describe("v0.4.0 amendments", () => {
     expect(rows[1]!.detail).toContain("timed out");
     expect(rows[0]!.check_id).toBe("oauth.protected_resource_metadata");
     expect(rows[1]!.check_id).toBe("oauth.www_authenticate");
+  });
+});
+
+describe("v0.5.0 amendments", () => {
+  it("m14: metadata omitting the OPTIONAL authorization_servers field passes (RFC 9728 §2.1)", () => {
+    // RFC 9728 §2.1 marks authorization_servers OPTIONAL — it may be omitted
+    // entirely when the set of authorization servers is not enumerable. Before
+    // the fix validateProtectedResourceMetadata required it as a non-empty
+    // URL[], false-failing conformant metadata like {resource: "..."} with
+    // oauth.protected_resource_metadata=fail — a conformance tool rejecting a
+    // valid RFC 9728 document. Now an absent field passes.
+    const ok = validateProtectedResourceMetadata({
+      resource: "https://api.example.com",
+    });
+    expect(ok.ok).toBe(true);
+    // The success-detail must not throw once the field is optional — it
+    // guarded the old d.authorization_servers.length access at oauth.ts:158.
+    expect(ok.detail).toContain("https://api.example.com");
+    expect(ok.detail).toContain("no authorization_servers");
+  });
+
+  it("m14: a present-but-invalid authorization_servers still fails (optional ≠ any value)", () => {
+    // OPTIONAL means "may be absent", not "may be any value". A present
+    // non-array / empty / non-URL value is malformed discovery metadata and
+    // must still fail, not false-pass.
+    expect(
+      validateProtectedResourceMetadata({
+        resource: "https://api.example.com",
+        authorization_servers: [],
+      }).ok
+    ).toBe(false);
+    expect(
+      validateProtectedResourceMetadata({
+        resource: "https://api.example.com",
+        authorization_servers: ["not-a-url"],
+      }).ok
+    ).toBe(false);
+    expect(
+      validateProtectedResourceMetadata({
+        resource: "https://api.example.com",
+        authorization_servers: "https://auth.example.com",
+      }).ok
+    ).toBe(false);
+  });
+
+  it("m14: a discovery surface omitting authorization_servers no longer false-fails end-to-end", async () => {
+    // The real regression: the HTTP auth probe used to fail conformant metadata
+    // that omits the OPTIONAL field. Now the metadata row passes.
+    const fakeFetch = (async (input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.endsWith("/.well-known/oauth-protected-resource")) {
+        return new Response(
+          JSON.stringify({ resource: "https://api.example.com" }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        );
+      }
+      return new Response("unauthorized", {
+        status: 401,
+        headers: {
+          "www-authenticate":
+            'Bearer resource_metadata="https://api.example.com/.well-known/oauth-protected-resource"',
+        },
+      });
+    }) as typeof fetch;
+
+    const rows = await checkOAuth("claude-code", {
+      baseUrl: "https://api.example.com/mcp",
+      fetchImpl: fakeFetch,
+    });
+    const meta = rows.find(
+      (r) => r.check_id === "oauth.protected_resource_metadata"
+    );
+    expect(meta?.status).toBe("pass");
+    expect(meta?.detail).toContain("no authorization_servers");
+  });
+
+  it("m15: a slow-dripping 200 (headers arrive, body never completes) fails 'timed out' instead of stalling", async () => {
+    // fetchWithTimeout cleared its AbortController timer in .finally as soon as
+    // headers arrived, so the subsequent await res.json() read the body OUTSIDE
+    // any timeout; a server returning 200 + content-type:application/json then
+    // never completing the body hung res.json() indefinitely. The metadata
+    // probe now bounds the body read too, so a slow-dripping 200 becomes a
+    // "metadata probe timed out after Nms" fail row instead of a multi-minute
+    // stall. The WWW-Authenticate probe reads only headers (no body), so it is
+    // unaffected and still resolves normally.
+    const slowBodyFetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.endsWith("/.well-known/oauth-protected-resource")) {
+        const signal = init?.signal;
+        const stream = new ReadableStream({
+          start(controller) {
+            // Mirror a real fetch: aborting the request signal errors the body
+            // stream so res.json() rejects instead of hanging forever.
+            signal?.addEventListener("abort", () => {
+              controller.error(new Error("aborted"));
+            });
+            // Never enqueue any chunk — the body never completes.
+          },
+        });
+        return Promise.resolve(
+          new Response(stream, {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          })
+        );
+      }
+      return Promise.resolve(
+        new Response("unauthorized", {
+          status: 401,
+          headers: {
+            "www-authenticate":
+              'Bearer resource_metadata="https://api.example.com/.well-known/oauth-protected-resource"',
+          },
+        })
+      );
+    }) as typeof fetch;
+
+    const rows = await checkOAuth("claude-code", {
+      baseUrl: "https://api.example.com/mcp",
+      fetchImpl: slowBodyFetch,
+      probeTimeoutMs: 100,
+    });
+    const meta = rows.find(
+      (r) => r.check_id === "oauth.protected_resource_metadata"
+    );
+    expect(meta?.status).toBe("fail");
+    expect(meta?.detail).toContain("timed out");
+    const www = rows.find((r) => r.check_id === "oauth.www_authenticate");
+    expect(www?.status).toBe("pass");
   });
 });
