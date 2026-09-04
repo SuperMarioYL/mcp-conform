@@ -120,8 +120,8 @@
     }
   },
   "meta": {
-    "content_version": "v0.4.0",
-    "generated_at": "2026-08-08T05:19:25Z",
+    "content_version": "0.6.0",
+    "generated_at": "2026-09-04T04:38:20Z",
     "web_factory_ref": "v1.1"
   }
 }

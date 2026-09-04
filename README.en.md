@@ -135,6 +135,8 @@ It wins outright on *breadth* — a curated README will always list more servers
 - [x] **v0.3 · stale stub version labels** — the Cursor/Gemini stubs drop the stale "(v0.2)" promise.
 - [x] **v0.4 · echo-arg fallback fix** — when the server has no "echo" tool, the harness no longer forces echo-specific `{message}` args onto an arbitrary fallback tool; it derives minimal args from the target tool's `inputSchema` and records `skip` (not a false `fail`) when a synthesized call still cannot succeed.
 - [x] **v0.4 · OAuth probe timeout** — each `checkOAuth` fetch is wrapped in an `AbortController` + timeout, so a hanging HTTP resource becomes a `fail` ("probe timed out") instead of stalling the CLI.
+- [x] **v0.5 · RFC 9728 authorization_servers optional** — `authorization_servers` is OPTIONAL per RFC 9728 §2.1, so metadata omitting it no longer false-fails (`resource` is the only REQUIRED field); when present it is still validated as a non-empty http(s) URL[].
+- [x] **v0.5 · OAuth metadata body-read timeout** — the metadata probe now uses `fetchJsonWithTimeout`, so the timeout covers the `res.json()` body read too; a slow-dripping 200 becomes a `fail` ("probe timed out") instead of stalling the CLI.
 - [ ] **Deeper OAuth** — go beyond discovery/shape to an end-to-end token grant.
 - [ ] **Real Cursor / Gemini adapters** — the MCP protocol is client-agnostic over stdio, so a "real" Cursor adapter would run the same checks as Claude Code and only add a column, not a check; deferred until a real client-level protocol divergence surfaces.
 

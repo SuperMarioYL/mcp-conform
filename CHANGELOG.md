@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-04
+
+### Fixed
+- **site content_version drift** — the shipped `web/site.json` had no
+  `content_version` field at all (it was a post-hoc web-factory build stamp
+  committed to `main` only on a "site: refresh" run), so the live Pages site's
+  version surface read `v0.4.0` while `VERSION`, `package.json`,
+  `src/version.ts` (`--version` and the handshake `clientInfo.version`), and the
+  `CHANGELOG` head all read `0.5.0` — a one-minor drift. `meta.content_version`
+  is now a source-tracked field set to the package version (no `v` prefix,
+  matching `VERSION`/`package.json`), and a new `test/version.test.ts`
+  lockstep test asserts `VERSION` == `package.json` version ==
+  `web/site.json` `meta.content_version` == `CHANGELOG` head version. The test
+  fails on the v0.5.0 tag (`content_version` absent → `undefined !== "0.5.0"`),
+  proving the drift was real.
+- **README roadmap v0.5.0 entries** — the roadmap in both `README.md` and
+  `README.en.md` listed v0.2/v0.3/v0.4 entries but omitted v0.5.0, even though
+  the v0.5.0 plan required the roadmap to note the release. The two v0.5.0
+  fixes (RFC 9728 `authorization_servers` optional; OAuth metadata body-read
+  timeout) are now listed in both roadmaps.
+
+### Notes
+- v0.6.0 is a cold-start bug-hunt release: no new feature scope. Since the
+  2026-08-25 v0.5.0 ship there has been no post-ship code or community activity
+  (0 open issues / 0 PRs / 0 forks); the two version/doc-drift fixes above are
+  the entirety of the release.
+
 ## [0.5.0] - 2026-08-25
 
 ### Fixed
@@ -165,7 +192,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bundled echo fixture server for a reproducible green-path demo.
 - Vitest suite covering the runner, spec checks, matrix roll-up, and badge output.
 
-[Unreleased]: https://github.com/SuperMarioYL/mcp-conform/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/SuperMarioYL/mcp-conform/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/SuperMarioYL/mcp-conform/releases/tag/v0.6.0
+[0.5.0]: https://github.com/SuperMarioYL/mcp-conform/releases/tag/v0.5.0
 [0.4.0]: https://github.com/SuperMarioYL/mcp-conform/releases/tag/v0.4.0
 [0.3.0]: https://github.com/SuperMarioYL/mcp-conform/releases/tag/v0.3.0
 [0.2.0]: https://github.com/SuperMarioYL/mcp-conform/releases/tag/v0.2.0
