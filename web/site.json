@@ -118,5 +118,8 @@
       "zh": "中立的跨客户端 MCP 一致性，一条命令搞定",
       "en": "Neutral cross-client MCP parity, in one command"
     }
+  },
+  "meta": {
+    "content_version": "0.6.0"
   }
 }

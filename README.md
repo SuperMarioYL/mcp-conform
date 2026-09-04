@@ -134,6 +134,8 @@ npx mcp-conform run node ./my-mcp-server.js --base-url https://api.example.com/m
 - [x] **v0.3 · 过期 stub 版本标签** — Cursor / Gemini stub 去掉「(v0.2)」的过期承诺。
 - [x] **v0.4 · echo 参数回退修正** — 当 server 无 "echo" 工具时，不再把 echo 专用 `{message}` 参数强塞给任意回退工具，而是从目标工具 `inputSchema` 派生最小合法参数；合成调用仍失败则记 `skip` 而非误报 `fail`。
 - [x] **v0.4 · OAuth 探测超时** — `checkOAuth` 的每次 fetch 包上 `AbortController` + 超时，挂起的 HTTP 资源变成 fail（"probe timed out"）而非永久卡死 CLI。
+- [x] **v0.5 · RFC 9728 authorization_servers 可选** — `authorization_servers` 按 RFC 9728 §2.1 标为 OPTIONAL，缺失时不再误判为 fail（`resource` 是唯一必填字段）；存在时仍校验为非空 http(s) URL[]。
+- [x] **v0.5 · OAuth 元数据体读超时** — 元数据探测改用 `fetchJsonWithTimeout`，超时覆盖 `res.json()` 体读全程，慢滴 200 变成 fail（"probe timed out"）而非永久卡死 CLI。
 - [ ] **更深的 OAuth** — 在 discovery/shape 之上走端到端 token grant。
 - [ ] **真实 Cursor / Gemini 适配器** — MCP 协议在 stdio 上是 client 无关的，所以「真实」Cursor 适配器会和 Claude Code 跑同一批校验、只多一列而非多一项检查；待出现「客户端在协议层有差异」的真实需求再做。
 
