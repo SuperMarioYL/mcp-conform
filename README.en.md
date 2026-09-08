@@ -1,147 +1,156 @@
-<div align="right"><sub><b>English</b>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="./README.md">简体中文</a></sub></div>
+[简体中文](./README.md) · [Website](https://mcp-conform.lei6393.com) · [GitHub](https://github.com/SuperMarioYL/mcp-conform)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./assets/hero-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="./assets/hero-light.svg">
-  <img src="./assets/hero-light.svg" width="880" alt="mcp-conform — neutral cross-client MCP conformance harness">
+  <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="./assets/presentation/hero-mobile-dark.svg">
+  <source media="(max-width: 600px)" srcset="./assets/presentation/hero-mobile-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/presentation/hero-dark.svg">
+  <img src="./assets/presentation/hero-light.svg" width="960" alt="Hero diagram">
 </picture>
 
-<p><sub>mcp-conform is the neutral cross-client <b>MCP</b> conformance harness that emits a per-client behavior + Zero-Touch OAuth parity matrix from a single command.</sub></p>
+# mcp-conform
 
-<p align="center">
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License: Apache-2.0"></a>
-  <a href="https://github.com/SuperMarioYL/mcp-conform/releases"><img src="https://img.shields.io/github/v/release/SuperMarioYL/mcp-conform?color=0071E3" alt="Latest release"></a>
-  <a href="https://github.com/SuperMarioYL/mcp-conform/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/SuperMarioYL/mcp-conform/ci.yml?branch=main&label=ci" alt="CI status"></a>
-  <img src="https://img.shields.io/badge/node-%E2%89%A520-339933?logo=node.js&logoColor=white" alt="Node >= 20">
-  <img src="https://img.shields.io/badge/MCP-ready-5E5CE6" alt="MCP-ready">
-  <img src="https://img.shields.io/badge/Cursor%20%C2%B7%20Gemini-roadmap-3B5B82" alt="Cursor / Gemini on roadmap">
-</p>
+**Make MCP behavior visible before integration**
 
-**Pain → fix: today you have anecdotes ("works in Cursor, not Claude Code") but no proof. mcp-conform runs any MCP server through behavior + OAuth checks with one `npx` command and hands you a publishable per-client conformance matrix.**
+mcp-conform launches a stdio MCP server, checks its handshake and tools through the MCP SDK, then produces a behavior/auth matrix. Unsupported client adapters remain marked n/a.
 
-`awesome-mcp-servers` ([punkpeye/awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers), 89k★) solves *discovery*, and the Zero-Touch OAuth spec defines *enterprise auth* — but nothing between them **asserts** that a given server actually implements the spec correctly across clients. That empty space belongs to a neutral tool by construction: no single client vendor is incentivized to certify that it behaves identically to its competitors. The servers under test are **Coding Agent** tools — e.g. [ChromeDevTools/chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) (44k★), exactly the kind of non-trivial server whose author carries the cross-client burden. mcp-conform is the harness that sits in that gap.
+## Why use it
 
-## Contents
+A server can expose a valid-looking tool list yet fail at initialization or invocation. Running a repeatable protocol scenario makes these failures visible before you add the server to an agent configuration.
 
-- [Architecture](#architecture)
-- [Install & Quickstart](#install--quickstart)
-- [Usage](#usage)
-- [Demo](#demo)
-- [vs awesome-mcp-servers](#vs-awesome-mcp-servers)
-- [Roadmap](#roadmap)
-- [License](#license)
+- **Run a real server** — The harness starts the target once over stdio and checks the live connection.
+- **Keep incomplete coverage visible** — The matrix distinguishes pass, fail, skip and n/a.
+- **Use results in CI** — JSON reports and SVG badges share the same collected check results.
 
-<h2 id="architecture"><img src="https://api.iconify.design/tabler:topology-star-3.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> Architecture</h2>
-
-A single Node CLI, one process (plus the spawned server child). `runner` orchestrates: pick the adapter → spawn the target server over stdio → run the pure `spec/*` check functions → collect results → `report/*` renders the matrix and writes the badge.
+## Architecture
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./assets/atlas-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="./assets/atlas-light.svg">
-  <img src="./assets/atlas-light.svg" width="880" alt="Architecture: CLI → runner → stdio spawn target MCP server → spec checks × client adapters → conformance matrix + badge">
+  <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="./assets/presentation/architecture-mobile-dark.svg">
+  <source media="(max-width: 600px)" srcset="./assets/presentation/architecture-mobile-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/presentation/architecture-dark.svg">
+  <img src="./assets/presentation/architecture-light.svg" width="960" alt="Architecture diagram">
 </picture>
 
-The core primitive is the **conformance matrix**: a typed report keyed by `(client, axis, check_id)`, with `axis ∈ {behavior, auth}`, `status ∈ {pass, fail, skip, n/a}`, and the failing assertion named on `fail`. It is a genuinely new noun — nothing today asserts identical cross-client behavior in a single typed report.
+runner.ts spawns the server with StdioClientTransport and initializes an MCP Client. The implemented adapter named claude-code runs handshake, tool-schema and tool-call checks. OAuth discovery is a separate HTTP probe when baseUrl is supplied. Cursor and Gemini adapters emit n/a rows without executing those applications.
 
-<h2 id="install--quickstart"><img src="https://api.iconify.design/tabler:rocket.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> Install & Quickstart</h2>
+| Component | Responsibility |
+| --- | --- |
+| `Server process` | stdio transport |
+| `MCP SDK client` | initialize connection |
+| `Check suite` | handshake / tools / auth |
+| `Matrix + badge` | status and evidence |
 
-No install required — run the bundled echo fixture with `npx` (cold clone to first result in ≤3 commands):
+## Install and quickstart
+
+Node.js 22+. The build compiles both the harness and the bundled fixture.
 
 ```bash
-git clone https://github.com/SuperMarioYL/mcp-conform && cd mcp-conform
-npm install && npm run build
-npx mcp-conform run node ./dist/fixtures/echo-server/server.js --badge
+git clone https://github.com/SuperMarioYL/mcp-conform.git
+cd mcp-conform
+npm ci
+npm run build
 ```
 
-<details><summary>sample output</summary>
+The complete command starts the included echo fixture and sends actual MCP messages locally. No model calls or external client applications are involved.
+
+```bash
+node dist/cli.js run node dist/fixtures/echo-server/server.js --json
+```
+
+## Recorded demo
+
+<picture>
+  <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="./assets/presentation/process-mobile-dark.svg">
+  <source media="(max-width: 600px)" srcset="./assets/presentation/process-mobile-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/presentation/process-dark.svg">
+  <img src="./assets/presentation/process-light.svg" width="960" alt="Process diagram">
+</picture>
+
+The bundled echo server is checked over stdio; Cursor/Gemini remain n/a and OAuth is skipped.
 
 ```text
-mcp-conform — conformance matrix (spec 0.1)
-server: node ./dist/fixtures/echo-server/server.js  [stdio]
-
-Client       behavior  auth
--------------------------------
-Claude Code  ✓ pass    ~ skip
-Cursor*      - n/a     - n/a
-Gemini*      - n/a     - n/a
-
-All applicable checks passed (n/a = adapter stubbed, skip = optional).
-
-* = adapter stubbed (returns n/a) — real adapter lands in a later release.
+{
+  "spec_version": "0.1",
+  "server": {
+    "cmd": "node dist/fixtures/echo-server/server.js",
+    "transport": "stdio"
+  },
+  "cells": [
+    {
+      "client": "claude-code",
+      "axis": "behavior",
+      "status": "pass"
+    },
+    {
+      "client": "claude-code",
+      "axis": "auth",
+      "status": "skip"
+    },
+    {
+      "client": "cursor",
+      "axis": "behavior",
+      "status": "n/a"
+    },
+    {
+      "client": "cursor",
+      "axis": "auth",
+      "status": "n/a"
+    },
+    {
+      "client": "gemini",
+      "axis": "behavior",
+      "status": "n/a"
+    },
+    {
+      "client": "gemini",
+      "axis": "auth",
+      "status": "n/a"
+    }
+  ]
+}
 ```
 
-`--badge` additionally writes `badge.svg` / `badge.json` you can paste into your own README.
-</details>
+The complete command and output are recorded in [docs/demo-results.json](./docs/demo-results.json). Inputs and reproduction code are included in the repository.
 
-<h2 id="usage"><img src="https://api.iconify.design/tabler:terminal-2.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> Usage</h2>
+## Usage
 
-The only subcommand is `run`, followed by the full command that launches your server:
+Replace the fixture command with the command that starts a server you intend to test. --cwd selects its working directory; --timeout sets the handshake timeout in milliseconds (default 15000). --report and --badge can take output paths. Any fail returns exit 1; skip and n/a do not fail CI.
 
 ```bash
-# 1. Run your own server (any executable command, stdio transport)
-npx mcp-conform run node ./my-mcp-server.js
-
-# 2. Emit stable JSON to assert against in CI
-npx mcp-conform run node ./my-mcp-server.js --json
-
-# 3. Write a badge + full report to paste into your README / commit
-npx mcp-conform run node ./my-mcp-server.js --badge --report
-
-# 4. Run the live Zero-Touch OAuth discovery probe (HTTP resource) so the auth
-#    column becomes a real pass/fail instead of the stdio skip
-npx mcp-conform run node ./my-mcp-server.js --base-url https://api.example.com/mcp
+node dist/cli.js run node dist/fixtures/echo-server/server.js --json
+node dist/cli.js run node dist/fixtures/echo-server/server.js --badge --report
 ```
 
-| Option | Effect |
+## Configuration
+
+Use --base-url only for an HTTP resource whose OAuth metadata you intend to probe. Without it, auth cells remain skip for stdio. The tool call uses echo when available; otherwise it derives minimal arguments from a candidate schema and can skip unsupported synthesized calls. Read the individual report rows rather than interpreting one green badge as universal compatibility.
+
+## Integrations and responsibilities
+
+<picture>
+  <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="./assets/presentation/integrations-mobile-dark.svg">
+  <source media="(max-width: 600px)" srcset="./assets/presentation/integrations-mobile-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/presentation/integrations-dark.svg">
+  <img src="./assets/presentation/integrations-light.svg" width="960" alt="Integrations diagram">
+</picture>
+
+The report describes this harness’s protocol checks. The claude-code row is an adapter label, not evidence that a Claude Code desktop or CLI application was launched. Authentication discovery checks metadata and challenge shape; it does not complete an OAuth token grant.
+
+| Route | Implemented role |
 | --- | --- |
-| `--json` | Print the typed matrix as JSON instead of the colored table (CI-friendly) |
-| `--badge [dir]` | Write `badge.svg` + `badge.json` |
-| `--report [path]` | Write the full `report.json` |
-| `--cwd <dir>` | Working directory for the spawned server |
-| `--timeout <ms>` | Handshake timeout (default 15000) |
-| `--base-url <url>` | HTTP base URL for the Zero-Touch OAuth discovery probe (Protected Resource Metadata + `WWW-Authenticate`). Omit for stdio (auth cell = `skip`) |
+| stdio MCP | child process transport |
+| MCP SDK | protocol handshake and tool calls |
+| HTTP metadata | optional OAuth discovery |
+| JSON report | CI-readable check rows |
+| SVG badge | derived matrix summary |
 
-Exit code: any `fail` → exit `1` (red CI); `n/a` and `skip` never fail CI. See [`examples/`](./examples/) for more.
+## Limits and next steps
 
-<h2 id="demo"><img src="https://api.iconify.design/tabler:photo.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> Demo</h2>
+- Only one adapter runs SDK checks. Cursor and Gemini are placeholders; none of the three named client applications is launched.
+- Running an arbitrary server also runs its code, and tools.call can have effects. Use a controlled server and fixture data.
+- The offline example does not exercise OAuth discovery or end-to-end authorization.
 
-![demo](assets/demo.gif)
+Implemented: stdio handshake/tool checks, stable report rows, JSON/badge outputs and optional HTTP discovery probes. Deeper OAuth authorization and real client-specific compatibility coverage remain future work. See CHANGELOG.md for supported behavior changes.
 
-> The 30-second happy path: `npx mcp-conform run` → stdio spawn → handshake/tools green → OAuth yellow (optional) → render the client × {behavior, auth} matrix → write the badge, exit 0.
+## License and contributions
 
-<h2 id="vs-awesome-mcp-servers"><img src="https://api.iconify.design/tabler:git-compare.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> vs awesome-mcp-servers</h2>
-
-An honest comparison with [punkpeye/awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers) — not a competitor, but the directory mcp-conform stands right beside:
-
-| Axis | awesome-mcp-servers | mcp-conform |
-| --- | :---: | :---: |
-| Servers discovered / curated | ✓ (89k★ of curation breadth) | — |
-| Actually runs a server and asserts behavior | — | ✓ |
-| Zero-Touch OAuth verification | — | ✓ (discovery / metadata / challenge shape) |
-| Per-client conformance matrix + badge | — | ✓ |
-| Real adapter coverage | n/a | partial (Claude Code only; Cursor / Gemini return `n/a`) |
-
-It wins outright on *breadth* — a curated README will always list more servers than a test tool. mcp-conform doesn't compete there; it fills the "is this server actually conformant across clients?" action the directory can't take on.
-
-<h2 id="roadmap"><img src="https://api.iconify.design/tabler:map-2.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> Roadmap</h2>
-
-- [x] **m1 · run the spec suite** — `run` spawns the server over stdio, runs handshake + tools checks, prints pass/fail.
-- [x] **m2 · emit the parity matrix** — Claude Code adapter + OAuth discovery checks, colored client × {auth, behavior} matrix + `badge.svg` / `report.json`.
-- [x] **m3 · canonical fixture** — bundled echo fixture, green matrix reproducible in one command.
-- [x] **v0.2 · live OAuth discovery probe** — `--base-url <url>` turns the auth cell from `skip` into a real pass/fail (v0.1 shipped the checks but the CLI never wired a base URL into them).
-- [x] **v0.2 · single-source version** — `clientInfo.version` and `--version` both read the `VERSION` file instead of a hardcoded literal.
-- [x] **v0.3 · OAuth discovery URL-shape validation** — `resource`, `authorization_servers`, and the `resource_metadata` challenge param are now validated as http(s) URLs per RFC 9728, so malformed metadata no longer false-passes.
-- [x] **v0.3 · stable behavior row set on failure** — on a failed handshake the behavior axis now emits `skip` rows so the `--report` row set matches a green run (stable for programmatic diffing).
-- [x] **v0.3 · stale stub version labels** — the Cursor/Gemini stubs drop the stale "(v0.2)" promise.
-- [x] **v0.4 · echo-arg fallback fix** — when the server has no "echo" tool, the harness no longer forces echo-specific `{message}` args onto an arbitrary fallback tool; it derives minimal args from the target tool's `inputSchema` and records `skip` (not a false `fail`) when a synthesized call still cannot succeed.
-- [x] **v0.4 · OAuth probe timeout** — each `checkOAuth` fetch is wrapped in an `AbortController` + timeout, so a hanging HTTP resource becomes a `fail` ("probe timed out") instead of stalling the CLI.
-- [x] **v0.5 · RFC 9728 authorization_servers optional** — `authorization_servers` is OPTIONAL per RFC 9728 §2.1, so metadata omitting it no longer false-fails (`resource` is the only REQUIRED field); when present it is still validated as a non-empty http(s) URL[].
-- [x] **v0.5 · OAuth metadata body-read timeout** — the metadata probe now uses `fetchJsonWithTimeout`, so the timeout covers the `res.json()` body read too; a slow-dripping 200 becomes a `fail` ("probe timed out") instead of stalling the CLI.
-- [ ] **Deeper OAuth** — go beyond discovery/shape to an end-to-end token grant.
-- [ ] **Real Cursor / Gemini adapters** — the MCP protocol is client-agnostic over stdio, so a "real" Cursor adapter would run the same checks as Claude Code and only add a column, not a check; deferred until a real client-level protocol divergence surfaces.
-
-## License
-
-[Apache-2.0](./LICENSE). Issues and PRs welcome: found a server that behaves differently across clients, or want to add a new client adapter? Open an issue with the repro command.
-
-<p align="center"><sub><a href="./LICENSE">Apache-2.0</a> © 2026 SuperMarioYL</sub></p>
+See [LICENSE](./LICENSE). When reporting an issue, include a minimal input, the command, and the observed output.

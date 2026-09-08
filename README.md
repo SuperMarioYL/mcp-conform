@@ -1,146 +1,156 @@
-<div align="right"><sub><a href="./README.en.md">English</a>&nbsp;&nbsp;|&nbsp;&nbsp;<b>简体中文</b></sub></div>
+[English](./README.en.md) · [Website](https://mcp-conform.lei6393.com) · [GitHub](https://github.com/SuperMarioYL/mcp-conform)
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./assets/hero-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="./assets/hero-light.svg">
-  <img src="./assets/hero-light.svg" width="880" alt="mcp-conform — 中立的跨客户端 MCP 一致性校验工具">
+  <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="./assets/presentation/hero-mobile-dark.svg">
+  <source media="(max-width: 600px)" srcset="./assets/presentation/hero-mobile-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/presentation/hero-dark.svg">
+  <img src="./assets/presentation/hero-light.svg" width="960" alt="Hero diagram">
 </picture>
 
-<p><sub>mcp-conform 是中立的跨客户端 <b>MCP</b> 一致性校验工具，一条命令输出每客户端的行为 + Zero-Touch OAuth 校验矩阵。</sub></p>
+# mcp-conform
 
-<p align="center">
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License: Apache-2.0"></a>
-  <a href="https://github.com/SuperMarioYL/mcp-conform/releases"><img src="https://img.shields.io/github/v/release/SuperMarioYL/mcp-conform?color=0071E3" alt="Latest release"></a>
-  <a href="https://github.com/SuperMarioYL/mcp-conform/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/SuperMarioYL/mcp-conform/ci.yml?branch=main&label=ci" alt="CI status"></a>
-  <img src="https://img.shields.io/badge/node-%E2%89%A520-339933?logo=node.js&logoColor=white" alt="Node >= 20">
-  <img src="https://img.shields.io/badge/MCP-ready-5E5CE6" alt="MCP-ready">
-  <img src="https://img.shields.io/badge/Cursor%20%C2%B7%20Gemini-roadmap-3B5B82" alt="Cursor / Gemini on roadmap">
-</p>
+**接入前，看清 MCP 服务的行为**
 
-**痛点 → 解法：你只有「在 Cursor 能跑、在 Claude Code 不行」的传闻，没有证据；mcp-conform 用一条 `npx` 命令把任意 MCP server 跑过行为 + OAuth 校验，给你一张可发布的每客户端一致性矩阵。**
+mcp-conform 启动 stdio MCP 服务，通过 MCP SDK 检查握手和工具，再生成行为与认证矩阵。未实现的客户端适配器保持 n/a。
 
-`awesome-mcp-servers`（[punkpeye/awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers)，89k★）解决了「发现」，Zero-Touch OAuth 规范定义了「企业级鉴权」，但两者之间没有任何工具去**断言**某个 server 真的跨客户端正确实现了规范。这块空地没人占——而它天然属于一个谁都不偏袒的中立工具：没有哪个客户端厂商有动力去认证「自己和竞品行为一致」。mcp-conform 就站在这个位置。
+## 为什么需要它
 
-## 目录
+服务可能展示看似有效的工具列表，却在初始化或调用时失败。可重复的协议场景能在加入 Agent 配置前暴露这些问题。
 
-- [架构](#架构)
-- [安装与快速开始](#安装与快速开始)
-- [用法](#用法)
-- [Demo](#demo)
-- [对比 awesome-mcp-servers](#对比-awesome-mcp-servers)
-- [路线图](#路线图)
-- [许可证](#许可证)
+- **运行真实服务进程** — 测试器通过 stdio 启动目标进程，并检查实际连接。
+- **呈现覆盖边界** — 矩阵区分 pass、fail、skip 和 n/a。
+- **在 CI 中使用结果** — JSON 报告和 SVG 徽章来自同一组检查结果。
 
-<h2 id="架构"><img src="https://api.iconify.design/tabler:topology-star-3.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> 架构</h2>
-
-单个 Node CLI，一个进程（外加被 spawn 出的 server 子进程）。`runner` 编排：选适配器 → 通过 stdio 启动目标 server → 跑 `spec/*` 纯校验函数 → 收集结果 → `report/*` 渲染矩阵并写徽章。
+## 架构
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="./assets/atlas-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="./assets/atlas-light.svg">
-  <img src="./assets/atlas-light.svg" width="880" alt="架构：CLI → runner → stdio 启动目标 MCP server → spec 校验 × client 适配器 → 一致性矩阵 + 徽章">
+  <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="./assets/presentation/architecture-mobile-dark.svg">
+  <source media="(max-width: 600px)" srcset="./assets/presentation/architecture-mobile-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/presentation/architecture-dark.svg">
+  <img src="./assets/presentation/architecture-light.svg" width="960" alt="Architecture diagram">
 </picture>
 
-核心 primitive 是**一致性矩阵**：一张以 `(client, axis, check_id)` 为键的类型化报告。`axis ∈ {behavior, auth}`，`status ∈ {pass, fail, skip, n/a}`，失败时带上具体断言名。这是个真正的新名词——今天没有任何东西能在单张类型化报告里断言「跨客户端行为一致」。
+runner.ts 使用 StdioClientTransport 启动服务并初始化 MCP Client。名为 claude-code 的已实现适配器运行握手、工具 Schema 和调用检查。提供 baseUrl 后，OAuth 发现通过独立 HTTP 探测完成。Cursor 与 Gemini 适配器只输出 n/a 行，不会执行这些应用。
 
-<h2 id="安装与快速开始"><img src="https://api.iconify.design/tabler:rocket.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> 安装与快速开始</h2>
+| 组件 | 职责 |
+| --- | --- |
+| `Server process` | stdio transport |
+| `MCP SDK client` | initialize connection |
+| `Check suite` | handshake / tools / auth |
+| `Matrix + badge` | status and evidence |
 
-无需安装，直接用 `npx` 跑内置 echo fixture（冷启动到首个结果 3 条命令以内）：
+## 安装与快速上手
+
+需要 Node.js 22+。构建会同时编译测试器和随仓样本服务。
 
 ```bash
-git clone https://github.com/SuperMarioYL/mcp-conform && cd mcp-conform
-npm install && npm run build
-npx mcp-conform run node ./dist/fixtures/echo-server/server.js --badge
+git clone https://github.com/SuperMarioYL/mcp-conform.git
+cd mcp-conform
+npm ci
+npm run build
 ```
 
-<details><summary>示例输出</summary>
+完整命令启动随仓 echo 服务，在本地收发实际 MCP 消息，不调用模型或外部客户端应用。
+
+```bash
+node dist/cli.js run node dist/fixtures/echo-server/server.js --json
+```
+
+## 实际运行示例
+
+<picture>
+  <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="./assets/presentation/process-mobile-dark.svg">
+  <source media="(max-width: 600px)" srcset="./assets/presentation/process-mobile-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/presentation/process-dark.svg">
+  <img src="./assets/presentation/process-light.svg" width="960" alt="Process diagram">
+</picture>
+
+The bundled echo server is checked over stdio; Cursor/Gemini remain n/a and OAuth is skipped.
 
 ```text
-mcp-conform — conformance matrix (spec 0.1)
-server: node ./dist/fixtures/echo-server/server.js  [stdio]
-
-Client       behavior  auth
--------------------------------
-Claude Code  ✓ pass    ~ skip
-Cursor*      - n/a     - n/a
-Gemini*      - n/a     - n/a
-
-All applicable checks passed (n/a = adapter stubbed, skip = optional).
-
-* = adapter stubbed (returns n/a) — real adapter lands in a later release.
+{
+  "spec_version": "0.1",
+  "server": {
+    "cmd": "node dist/fixtures/echo-server/server.js",
+    "transport": "stdio"
+  },
+  "cells": [
+    {
+      "client": "claude-code",
+      "axis": "behavior",
+      "status": "pass"
+    },
+    {
+      "client": "claude-code",
+      "axis": "auth",
+      "status": "skip"
+    },
+    {
+      "client": "cursor",
+      "axis": "behavior",
+      "status": "n/a"
+    },
+    {
+      "client": "cursor",
+      "axis": "auth",
+      "status": "n/a"
+    },
+    {
+      "client": "gemini",
+      "axis": "behavior",
+      "status": "n/a"
+    },
+    {
+      "client": "gemini",
+      "axis": "auth",
+      "status": "n/a"
+    }
+  ]
+}
 ```
 
-`--badge` 会额外写出 `badge.svg` / `badge.json`，可直接贴进你自己的 README。
-</details>
+完整命令与输出保存在 [docs/demo-results.json](./docs/demo-results.json). 输入和复现代码均随仓提供。
 
-<h2 id="用法"><img src="https://api.iconify.design/tabler:terminal-2.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> 用法</h2>
+## 用法
 
-唯一子命令是 `run`，后面跟「如何启动你的 server」的完整命令：
+将样本命令替换为准备测试的服务启动命令。--cwd 指定工作目录，--timeout 设置握手超时毫秒数，默认 15000。--report 和 --badge 可指定输出路径。任何 fail 都返回 1，skip 和 n/a 不使 CI 失败。
 
 ```bash
-# 1. 跑你自己的 server（任意可执行命令，stdio 传输）
-npx mcp-conform run node ./my-mcp-server.js
-
-# 2. 输出稳定 JSON，接进 CI 断言
-npx mcp-conform run node ./my-mcp-server.js --json
-
-# 3. 写出徽章 + 完整报告，贴进 README / 提交进仓库
-npx mcp-conform run node ./my-mcp-server.js --badge --report
-
-# 4. 跑 Zero-Touch OAuth 的活体 discovery 探测（HTTP 资源），让 auth 列变成真实 pass/fail
-npx mcp-conform run node ./my-mcp-server.js --base-url https://api.example.com/mcp
+node dist/cli.js run node dist/fixtures/echo-server/server.js --json
+node dist/cli.js run node dist/fixtures/echo-server/server.js --badge --report
 ```
 
-| 选项 | 作用 |
+## 配置
+
+仅在准备探测某个 HTTP 资源的 OAuth 元数据时使用 --base-url。省略后 stdio 的 auth 单元保持 skip。存在 echo 时优先调用，否则从候选工具 Schema 推导最小参数，无法支持的合成调用可能被跳过。应阅读各检查行，不能把绿色徽章理解为全面兼容。
+
+## 集成与职责分工
+
+<picture>
+  <source media="(max-width: 600px) and (prefers-color-scheme: dark)" srcset="./assets/presentation/integrations-mobile-dark.svg">
+  <source media="(max-width: 600px)" srcset="./assets/presentation/integrations-mobile-light.svg">
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/presentation/integrations-dark.svg">
+  <img src="./assets/presentation/integrations-light.svg" width="960" alt="Integrations diagram">
+</picture>
+
+报告描述本测试器的协议检查。claude-code 行是适配器名称，并不证明启动过 Claude Code 桌面或 CLI 应用。认证发现只检查元数据和挑战格式，不完成 OAuth Token 授权。
+
+| 路径 | 已实现职责 |
 | --- | --- |
-| `--json` | 打印类型化矩阵 JSON（替代彩色表），适合 CI |
-| `--badge [dir]` | 写出 `badge.svg` + `badge.json` |
-| `--report [path]` | 写出完整 `report.json` |
-| `--cwd <dir>` | 被 spawn server 的工作目录 |
-| `--timeout <ms>` | 握手超时（默认 15000） |
-| `--base-url <url>` | HTTP 资源 base URL，跑 Zero-Touch OAuth discovery 探测（Protected Resource Metadata + `WWW-Authenticate`）。省略时（stdio）auth 列为 `skip` |
+| stdio MCP | child process transport |
+| MCP SDK | protocol handshake and tool calls |
+| HTTP metadata | optional OAuth discovery |
+| JSON report | CI-readable check rows |
+| SVG badge | derived matrix summary |
 
-退出码：任意 `fail` → 退出 `1`（CI 红）；`n/a` 与 `skip` 不会让 CI 失败。更多见 [`examples/`](./examples/)。
+## 限制与后续方向
 
-<h2 id="demo"><img src="https://api.iconify.design/tabler:photo.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> Demo</h2>
+- 只有一个适配器执行 SDK 检查。Cursor 和 Gemini 是占位实现，三个名称对应的客户端应用都不会被启动。
+- 启动任意服务会运行其代码，tools.call 也可能产生作用。应使用可控服务和样本数据。
+- 本地示例未运行 OAuth 发现或端到端授权。
 
-![demo](assets/demo.gif)
+已实现 stdio 握手与工具检查、稳定报告行、JSON 和徽章输出，以及可选 HTTP 发现探测。更深入的 OAuth 授权和真实客户端兼容覆盖仍属后续方向。支持行为的变更见 CHANGELOG.md。
 
-> 30 秒走完 happy path：`npx mcp-conform run` → stdio 启动 → 握手/tools 绿 → OAuth 黄（可选）→ 渲染 client × {behavior, auth} 矩阵 → 写徽章、退出 0。
+## 许可与贡献
 
-<h2 id="对比-awesome-mcp-servers"><img src="https://api.iconify.design/tabler:git-compare.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> 对比 awesome-mcp-servers</h2>
-
-诚实对比 [punkpeye/awesome-mcp-servers](https://github.com/punkpeye/awesome-mcp-servers)——它不是竞品，而是 mcp-conform 紧挨着站的那个目录：
-
-| 维度 | awesome-mcp-servers | mcp-conform |
-| --- | :---: | :---: |
-| 发现 / 收录的 server 数量 | ✓（89k★ 的策展广度） | — |
-| 实际运行 server 并断言行为 | — | ✓ |
-| Zero-Touch OAuth 校验 | — | ✓（discovery / 元数据 / challenge 形状） |
-| 每客户端一致性矩阵 + 徽章 | — | ✓ |
-| 真实适配器覆盖 | 不适用 | partial（仅 Claude Code 实装；Cursor / Gemini 返回 `n/a`） |
-
-它在「广度」上完胜——一个策展 README 永远比一个测试工具收录更多 server。mcp-conform 不抢这块，它补的是「这个 server 真的跨客户端合规吗」的那个动作。
-
-<h2 id="路线图"><img src="https://api.iconify.design/tabler:map-2.svg?color=%230071E3&width=24" height="22" align="absmiddle" alt=""> 路线图</h2>
-
-- [x] **m1 · 跑通校验集** — `run` 经 stdio 启动 server，跑握手 + tools 校验，打印 pass/fail。
-- [x] **m2 · 输出一致性矩阵** — Claude Code 适配器 + OAuth discovery 校验，彩色 client × {auth, behavior} 矩阵 + `badge.svg` / `report.json`。
-- [x] **m3 · 标准 fixture** — 内置 echo fixture，一条命令复现绿矩阵。
-- [x] **v0.2 · 活体 OAuth discovery 探测** — `--base-url <url>` 让 auth 列从 `skip` 变成真实的 pass/fail（v0.1 写了校验但 CLI 从未把 base URL 接进去）。
-- [x] **v0.2 · 版本单一来源** — `clientInfo.version` 与 `--version` 统一从 `VERSION` 文件读取，不再硬编码。
-- [x] **v0.3 · OAuth discovery URL 形状校验** — `resource` / `authorization_servers` / `resource_metadata` 现按 RFC 9728 校验为 http(s) URL，畸形元数据不再误判为 pass。
-- [x] **v0.3 · 失败时行为行集稳定** — 握手失败时补齐 `skip` 行，使 `--report` 的行为行集与绿矩阵一致（便于程序化 diff）。
-- [x] **v0.3 · 过期 stub 版本标签** — Cursor / Gemini stub 去掉「(v0.2)」的过期承诺。
-- [x] **v0.4 · echo 参数回退修正** — 当 server 无 "echo" 工具时，不再把 echo 专用 `{message}` 参数强塞给任意回退工具，而是从目标工具 `inputSchema` 派生最小合法参数；合成调用仍失败则记 `skip` 而非误报 `fail`。
-- [x] **v0.4 · OAuth 探测超时** — `checkOAuth` 的每次 fetch 包上 `AbortController` + 超时，挂起的 HTTP 资源变成 fail（"probe timed out"）而非永久卡死 CLI。
-- [x] **v0.5 · RFC 9728 authorization_servers 可选** — `authorization_servers` 按 RFC 9728 §2.1 标为 OPTIONAL，缺失时不再误判为 fail（`resource` 是唯一必填字段）；存在时仍校验为非空 http(s) URL[]。
-- [x] **v0.5 · OAuth 元数据体读超时** — 元数据探测改用 `fetchJsonWithTimeout`，超时覆盖 `res.json()` 体读全程，慢滴 200 变成 fail（"probe timed out"）而非永久卡死 CLI。
-- [ ] **更深的 OAuth** — 在 discovery/shape 之上走端到端 token grant。
-- [ ] **真实 Cursor / Gemini 适配器** — MCP 协议在 stdio 上是 client 无关的，所以「真实」Cursor 适配器会和 Claude Code 跑同一批校验、只多一列而非多一项检查；待出现「客户端在协议层有差异」的真实需求再做。
-
-## 许可证
-
-[Apache-2.0](./LICENSE)。欢迎提 issue 或 PR：发现某个 server 在某客户端下行为不一致，或想加一个新客户端适配器，开个 issue 描述复现命令即可。
-
-<p align="center"><sub><a href="./LICENSE">Apache-2.0</a> © 2026 SuperMarioYL</sub></p>
+许可见 [LICENSE](./LICENSE). 反馈问题时请提供最小输入、执行命令和实际输出。

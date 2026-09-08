@@ -1,7 +1,7 @@
 {
   "name": "mcp-conform",
   "version": "0.6.0",
-  "description": "Neutral cross-client MCP conformance harness: run any MCP server through Claude Code / Cursor / Gemini behavior + Zero-Touch OAuth checks and emit a per-client conformance matrix.",
+  "description": "Run local stdio MCP servers through SDK handshake and tool checks, with JSON reports, badges and optional OAuth discovery probes.",
   "type": "module",
   "license": "Apache-2.0",
   "author": "supermario_leo",

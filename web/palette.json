@@ -1,0 +1,38 @@
+{
+  "mode": "auto",
+  "id": "e6d056-b7e76a-f6d0ac-0363db5cc210",
+  "identity": "https://github.com/supermarioyl/mcp-conform",
+  "primary": "#e6d056",
+  "secondary": "#b7e76a",
+  "highlight": "#f6d0ac",
+  "dark": {
+    "bg": "#0a0b0d",
+    "panel": "#131617",
+    "code": "#141513",
+    "ink": "#fdf6ee",
+    "muted": "#b2b5a8",
+    "line": "#3a361d",
+    "primary": "#e6d056",
+    "secondary": "#b7e76a",
+    "highlight": "#f6d0ac",
+    "accent": "#e6d056",
+    "buttonStart": "#847731",
+    "buttonEnd": "#657f3b",
+    "buttonText": "#ffffff"
+  },
+  "light": {
+    "bg": "#fefdf9",
+    "panel": "#fefdf7",
+    "code": "#fdfcf3",
+    "ink": "#27271c",
+    "muted": "#72766b",
+    "line": "#f7f0cb",
+    "primary": "#817530",
+    "secondary": "#637d3a",
+    "highlight": "#85715d",
+    "accent": "#817530",
+    "buttonStart": "#847731",
+    "buttonEnd": "#657f3b",
+    "buttonText": "#ffffff"
+  }
+}

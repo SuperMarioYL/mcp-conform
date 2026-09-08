@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "source_revision": "1db3900a4d046802bbb5a6b6f4ff22286abefc37",
+  "scope": "Live local stdio MCP echo fixture. SDK protocol checks; no actual Claude Code, Cursor or Gemini application and no OAuth endpoint.",
+  "steps": [
+    {
+      "label": "Recorded run",
+      "body": "Live local stdio MCP echo fixture. SDK protocol checks; no actual Claude Code, Cursor or Gemini application and no OAuth endpoint.",
+      "command": "node dist/cli.js run node dist/fixtures/echo-server/server.js --json",
+      "output": "{\n  \"spec_version\": \"0.1\",\n  \"server\": {\n    \"cmd\": \"node dist/fixtures/echo-server/server.js\",\n    \"transport\": \"stdio\"\n  },\n  \"cells\": [\n    {\n      \"client\": \"claude-code\",\n      \"axis\": \"behavior\",\n      \"status\": \"pass\"\n    },\n    {\n      \"client\": \"claude-code\",\n      \"axis\": \"auth\",\n      \"status\": \"skip\"\n    },\n    {\n      \"client\": \"cursor\",\n      \"axis\": \"behavior\",\n      \"status\": \"n/a\"\n    },\n    {\n      \"client\": \"cursor\",\n      \"axis\": \"auth\",\n      \"status\": \"n/a\"\n    },\n    {\n      \"client\": \"gemini\",\n      \"axis\": \"behavior\",\n      \"status\": \"n/a\"\n    },\n    {\n      \"client\": \"gemini\",\n      \"axis\": \"auth\",\n      \"status\": \"n/a\"\n    }\n  ]\n}"
+    }
+  ]
+}

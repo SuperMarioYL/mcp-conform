@@ -1,127 +1,215 @@
 {
-  "schema": 1,
+  "schema": 3,
   "name": "mcp-conform",
   "github": "https://github.com/SuperMarioYL/mcp-conform",
   "host": "mcp-conform.lei6393.com",
+  "palette": "auto",
   "lang": {
-    "primary": "zh",
+    "primary": "en",
     "toggle": true
   },
-  "accent": [
-    "#0071E3"
-  ],
+  "meta": {
+    "visual_style": "neon-particle",
+    "demo_source": "docs/demo-results.json"
+  },
   "hero": {
-    "eyebrow": {
-      "zh": "中立 · 一条命令 · 跨客户端",
-      "en": "Neutral · one command · cross-client"
-    },
     "headline": {
-      "zh": "「Cursor 能跑、\nClaude Code 不行？」\n一条命令拿到证据",
-      "en": "\"Works in Cursor,\nbreaks in Claude Code?\"\nOne command, real proof."
+      "en": "Make MCP behavior visible before integration",
+      "zh": "接入前，看清 MCP 服务的行为"
     },
     "sub": {
-      "zh": "给 MCP server 的作者：一条命令在你本机把 server 真跑一遍，告诉你它在每个客户端里行为是否一致、鉴权是否对得上，再生成一张能贴进 README 的徽章。开源、Apache 2.0，不偏袒任何客户端厂商。",
-      "en": "For MCP server authors: one command actually runs your server on your machine, tells you whether it behaves consistently across clients and whether its auth lines up, then generates a badge for your README. Open source, Apache 2.0, no vendor bias."
+      "en": "mcp-conform launches a stdio MCP server, checks its handshake and tools through the MCP SDK, then produces a behavior/auth matrix. Unsupported client adapters remain marked n/a.",
+      "zh": "mcp-conform 启动 stdio MCP 服务，通过 MCP SDK 检查握手和工具，再生成行为与认证矩阵。未实现的客户端适配器保持 n/a。"
     },
-    "command": "npx mcp-conform run node ./my-mcp-server.js",
-    "cta": {
-      "zh": "开始使用",
-      "en": "Get started"
-    },
-    "ctaGithub": {
-      "zh": "在 GitHub 查看",
-      "en": "View on GitHub"
-    }
+    "href": "#quickstart"
   },
   "advantages": [
     {
       "title": {
-        "zh": "一条命令，跑你自己的 server",
-        "en": "One command, your own server"
+        "en": "Run a real server",
+        "zh": "运行真实服务进程"
       },
       "body": {
-        "zh": "不用搭测试脚手架，也不用改你的 server。告诉它「你平时怎么启动 server」，它就在你本机把 server 真正跑起来、挨个客户端对照检查。它不预设你的 server 一定有某个特定工具——按你 server 自己的工具如实探，所以一个合规的 server 就算没有示例里那种工具，也会判「过」而非被冤枉成「不过」。内置示例 server，三条命令复现第一张全绿矩阵。",
-        "en": "No test harness to set up, no changes to your server. Tell it how you normally start your server and it actually runs it on your machine, checking it against each client. It doesn't assume your server has any particular tool — it drives whatever your server actually exposes, so a conformant server without the sample's tool still passes instead of being falsely marked as failing. Ships with a sample server — three commands to your first all-green matrix."
-      },
-      "chips": [
-        "› 不用改你的 server",
-        "› 不预设你的工具长什么样"
-      ]
+        "en": "The harness starts the target once over stdio and checks the live connection.",
+        "zh": "测试器通过 stdio 启动目标进程，并检查实际连接。"
+      }
     },
     {
       "title": {
-        "zh": "把传闻变成一张对照表",
-        "en": "Turn hearsay into a table"
+        "en": "Keep incomplete coverage visible",
+        "zh": "呈现覆盖边界"
       },
       "body": {
-        "zh": "「在 Cursor 能跑、在 Claude Code 不行」不再是群聊里的一句传闻。你拿到一张每客户端的行为 + 鉴权对照表：哪项过了、哪项没过、没过的是哪一条检查，一目了然。今天没有别的工具能在一张表里断言「跨客户端行为一致」。",
-        "en": "\"Works in Cursor, breaks in Claude Code\" stops being a chat-room rumor. You get a per-client behavior + auth table: what passed, what failed, and exactly which check failed — at a glance. Nothing else today asserts \"cross-client behavior parity\" in a single table."
-      },
-      "chips": [
-        "› 每客户端一行",
-        "› 失败指到具体检查"
-      ]
+        "en": "The matrix distinguishes pass, fail, skip and n/a.",
+        "zh": "矩阵区分 pass、fail、skip 和 n/a。"
+      }
     },
     {
       "title": {
-        "zh": "鉴权对不对，跑一次就知道",
-        "en": "Is the auth right? Run once and know"
+        "en": "Use results in CI",
+        "zh": "在 CI 中使用结果"
       },
       "body": {
-        "zh": "不用再猜你的 server 鉴权是不是按规范来的。给它一个线上地址，它真的去探一下你的鉴权是不是按各客户端期待的方式接好的——从「跳过」变成实打实的过 / 不过。就算那个地址连得上却迟迟不回，它也会在几秒内判「探测超时、不过」，而不是让你的终端卡死——一次跑完，永远不超过 30 秒。",
-        "en": "Stop guessing whether your server's auth follows the spec. Give it a live URL and it actually probes whether your auth is wired the way clients expect — turning a \"skipped\" into a real pass or fail. And if that URL connects but never answers, it calls it a timed-out fail within seconds instead of freezing your terminal — every run finishes in well under 30 seconds."
+        "en": "JSON reports and SVG badges share the same collected check results.",
+        "zh": "JSON 报告和 SVG 徽章来自同一组检查结果。"
+      }
+    }
+  ],
+  "demo": {
+    "title": {
+      "en": "Run it on a complete example",
+      "zh": "运行完整示例"
+    },
+    "note": {
+      "en": "The complete command starts the included echo fixture and sends actual MCP messages locally. No model calls or external client applications are involved.",
+      "zh": "完整命令启动随仓 echo 服务，在本地收发实际 MCP 消息，不调用模型或外部客户端应用。"
+    },
+    "source": "https://github.com/SuperMarioYL/mcp-conform/blob/main/docs/demo-results.json",
+    "steps": [
+      {
+        "label": "Recorded run",
+        "body": "Live local stdio MCP echo fixture. SDK protocol checks; no actual Claude Code, Cursor or Gemini application and no OAuth endpoint.",
+        "command": "node dist/cli.js run node dist/fixtures/echo-server/server.js --json",
+        "output": "{\n  \"spec_version\": \"0.1\",\n  \"server\": {\n    \"cmd\": \"node dist/fixtures/echo-server/server.js\",\n    \"transport\": \"stdio\"\n  },\n  \"cells\": [\n    {\n      \"client\": \"claude-code\",\n      \"axis\": \"behavior\",\n      \"status\": \"pass\"\n    },\n    {\n      \"client\": \"claude-code\",\n      \"axis\": \"auth\",\n      \"status\": \"skip\"\n    },\n    {\n      \"client\": \"cursor\",\n      \"axis\": \"behavior\",\n      \"status\": \"n/a\"\n    },\n    {\n      \"client\": \"cursor\",\n      \"axis\": \"auth\",\n      \"status\": \"n/a\"\n    },\n    {\n      \"client\": \"gemini\",\n      \"axis\": \"behavior\",\n      \"status\": \"n/a\"\n    },\n    {\n      \"client\": \"gemini\",\n      \"axis\": \"auth\",\n      \"status\": \"n/a\"\n    }\n  ]\n}",
+        "image": "/assets/presentation/demo-0-light.svg",
+        "imageDark": "/assets/presentation/demo-0-dark.svg"
+      }
+    ]
+  },
+  "quickstart": {
+    "title": {
+      "en": "Try it locally",
+      "zh": "本地上手"
+    },
+    "body": {
+      "en": "The complete command starts the included echo fixture and sends actual MCP messages locally. No model calls or external client applications are involved.",
+      "zh": "完整命令启动随仓 echo 服务，在本地收发实际 MCP 消息，不调用模型或外部客户端应用。"
+    },
+    "steps": [
+      {
+        "title": {
+          "en": "Install from source",
+          "zh": "从源码安装"
+        },
+        "code": "git clone https://github.com/SuperMarioYL/mcp-conform.git\ncd mcp-conform\nnpm ci\nnpm run build"
       },
-      "chips": [
-        "› 给个地址，真跑一遍",
-        "› 卡住也判得出 · 30 秒内收尾"
-      ]
+      {
+        "title": {
+          "en": "Run the included example",
+          "zh": "运行随仓示例"
+        },
+        "code": "node dist/cli.js run node dist/fixtures/echo-server/server.js --json"
+      }
+    ]
+  },
+  "limitations": [
+    {
+      "en": "Only one adapter runs SDK checks. Cursor and Gemini are placeholders; none of the three named client applications is launched.",
+      "zh": "只有一个适配器执行 SDK 检查。Cursor 和 Gemini 是占位实现，三个名称对应的客户端应用都不会被启动。"
     },
     {
-      "title": {
-        "zh": "README 里贴徽章，CI 里挡回归",
-        "en": "A badge for README, a gate for CI"
-      },
-      "body": {
-        "zh": "一条命令写出能贴进 README 的徽章和完整报告。把检查接进 CI：哪天某个客户端从「过」掉到「不过」，构建立刻变红、拦住回归。可选检查不通过也不会误报。",
-        "en": "One command writes a badge for your README and a full report. Wire it into CI: the day a client drops from pass to fail, the build goes red and blocks the regression. Optional checks that don't pass never cause false alarms."
-      },
-      "chips": [
-        "› 一键出徽章 + 报告",
-        "› 回归即红灯"
-      ]
+      "en": "Running an arbitrary server also runs its code, and tools.call can have effects. Use a controlled server and fixture data.",
+      "zh": "启动任意服务会运行其代码，tools.call 也可能产生作用。应使用可控服务和样本数据。"
+    },
+    {
+      "en": "The offline example does not exercise OAuth discovery or end-to-end authorization.",
+      "zh": "本地示例未运行 OAuth 发现或端到端授权。"
     }
   ],
   "scene": {
-    "kind": "hub-nodes",
-    "nodes": [
-      "Claude Code",
-      "Cursor",
-      "Gemini"
+    "kind": "neon-graph",
+    "fallback": "/assets/presentation/scene-dark.svg",
+    "fallbackLight": "/assets/presentation/scene-light.svg"
+  },
+  "story": {
+    "intro": {
+      "title": {
+        "en": "A concrete task",
+        "zh": "从实际任务出发"
+      },
+      "body": {
+        "en": "A server can expose a valid-looking tool list yet fail at initialization or invocation. Running a repeatable protocol scenario makes these failures visible before you add the server to an agent configuration.",
+        "zh": "服务可能展示看似有效的工具列表，却在初始化或调用时失败。可重复的协议场景能在加入 Agent 配置前暴露这些问题。"
+      }
+    },
+    "sections": [
+      {
+        "title": {
+          "en": "Follow the operation",
+          "zh": "处理过程"
+        },
+        "body": {
+          "en": "runner.ts spawns the server with StdioClientTransport and initializes an MCP Client. The implemented adapter named claude-code runs handshake, tool-schema and tool-call checks. OAuth discovery is a separate HTTP probe when baseUrl is supplied. Cursor and Gemini adapters emit n/a rows without executing those applications.",
+          "zh": "runner.ts 使用 StdioClientTransport 启动服务并初始化 MCP Client。名为 claude-code 的已实现适配器运行握手、工具 Schema 和调用检查。提供 baseUrl 后，OAuth 发现通过独立 HTTP 探测完成。Cursor 与 Gemini 适配器只输出 n/a 行，不会执行这些应用。"
+        },
+        "image": {
+          "light": "/assets/presentation/process-light.svg",
+          "dark": "/assets/presentation/process-dark.svg",
+          "alt": {
+            "en": "Follow the operation",
+            "zh": "处理过程"
+          }
+        }
+      },
+      {
+        "title": {
+          "en": "One SDK connection feeds the report",
+          "zh": "一次 SDK 连接生成检查报告"
+        },
+        "body": {
+          "en": "runner.ts spawns the server with StdioClientTransport and initializes an MCP Client. The implemented adapter named claude-code runs handshake, tool-schema and tool-call checks. OAuth discovery is a separate HTTP probe when baseUrl is supplied. Cursor and Gemini adapters emit n/a rows without executing those applications.",
+          "zh": "runner.ts 使用 StdioClientTransport 启动服务并初始化 MCP Client。名为 claude-code 的已实现适配器运行握手、工具 Schema 和调用检查。提供 baseUrl 后，OAuth 发现通过独立 HTTP 探测完成。Cursor 与 Gemini 适配器只输出 n/a 行，不会执行这些应用。"
+        },
+        "image": {
+          "light": "/assets/presentation/architecture-light.svg",
+          "dark": "/assets/presentation/architecture-dark.svg",
+          "alt": {
+            "en": "One SDK connection feeds the report",
+            "zh": "一次 SDK 连接生成检查报告"
+          }
+        }
+      },
+      {
+        "title": {
+          "en": "Connect the pieces",
+          "zh": "输入与输出"
+        },
+        "body": {
+          "en": "The report describes this harness’s protocol checks. The claude-code row is an adapter label, not evidence that a Claude Code desktop or CLI application was launched. Authentication discovery checks metadata and challenge shape; it does not complete an OAuth token grant.",
+          "zh": "报告描述本测试器的协议检查。claude-code 行是适配器名称，并不证明启动过 Claude Code 桌面或 CLI 应用。认证发现只检查元数据和挑战格式，不完成 OAuth Token 授权。"
+        },
+        "image": {
+          "light": "/assets/presentation/integrations-light.svg",
+          "dark": "/assets/presentation/integrations-dark.svg",
+          "alt": {
+            "en": "Connect the pieces",
+            "zh": "输入与输出"
+          }
+        }
+      }
+    ],
+    "details": [
+      {
+        "title": {
+          "en": "Configuration",
+          "zh": "配置"
+        },
+        "body": {
+          "en": "Use --base-url only for an HTTP resource whose OAuth metadata you intend to probe. Without it, auth cells remain skip for stdio. The tool call uses echo when available; otherwise it derives minimal arguments from a candidate schema and can skip unsupported synthesized calls. Read the individual report rows rather than interpreting one green badge as universal compatibility.",
+          "zh": "仅在准备探测某个 HTTP 资源的 OAuth 元数据时使用 --base-url。省略后 stdio 的 auth 单元保持 skip。存在 echo 时优先调用，否则从候选工具 Schema 推导最小参数，无法支持的合成调用可能被跳过。应阅读各检查行，不能把绿色徽章理解为全面兼容。"
+        }
+      },
+      {
+        "title": {
+          "en": "Further use",
+          "zh": "进一步使用"
+        },
+        "body": {
+          "en": "Replace the fixture command with the command that starts a server you intend to test. --cwd selects its working directory; --timeout sets the handshake timeout in milliseconds (default 15000). --report and --badge can take output paths. Any fail returns exit 1; skip and n/a do not fail CI.",
+          "zh": "将样本命令替换为准备测试的服务启动命令。--cwd 指定工作目录，--timeout 设置握手超时毫秒数，默认 15000。--report 和 --badge 可指定输出路径。任何 fail 都返回 1，skip 和 n/a 不使 CI 失败。"
+        },
+        "code": "node dist/cli.js run node dist/fixtures/echo-server/server.js --json\nnode dist/cli.js run node dist/fixtures/echo-server/server.js --badge --report"
+      }
     ]
-  },
-  "cta": {
-    "headline": {
-      "zh": "把「在 Cursor 能跑、在 Claude Code 不行」的传闻，变成一张可发布的矩阵",
-      "en": "Turn \"works in Cursor, not Claude Code\" hearsay into a publishable matrix"
-    },
-    "sub": {
-      "zh": "开源、Apache 2.0、无付费墙。中立跨厂商一致性，没有哪个客户端厂商能独占。",
-      "en": "Open source, Apache 2.0, no paywall. Neutral cross-vendor parity no single client can own."
-    },
-    "button": {
-      "zh": "在 GitHub 上开始",
-      "en": "Get started on GitHub"
-    }
-  },
-  "footer": {
-    "tag": {
-      "zh": "中立的跨客户端 MCP 一致性，一条命令搞定",
-      "en": "Neutral cross-client MCP parity, in one command"
-    }
-  },
-  "meta": {
-    "content_version": "0.6.0",
-    "generated_at": "2026-09-04T04:38:20Z",
-    "web_factory_ref": "v1.1"
   }
 }

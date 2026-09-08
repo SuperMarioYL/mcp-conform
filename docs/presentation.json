@@ -1,0 +1,82 @@
+{
+  "name": "mcp-conform",
+  "tagline": "Make MCP behavior visible before integration",
+  "architecture": {
+    "title": "One SDK connection feeds the report",
+    "nodes": [
+      {
+        "title": "Server process",
+        "detail": "stdio transport"
+      },
+      {
+        "title": "MCP SDK client",
+        "detail": "initialize connection"
+      },
+      {
+        "title": "Check suite",
+        "detail": "handshake / tools / auth"
+      },
+      {
+        "title": "Matrix + badge",
+        "detail": "status and evidence"
+      }
+    ],
+    "edges": [
+      [
+        0,
+        1
+      ],
+      [
+        1,
+        2
+      ],
+      [
+        2,
+        3
+      ]
+    ]
+  },
+  "process": {
+    "title": "From input to a useful result",
+    "steps": [
+      {
+        "title": "Start fixture",
+        "detail": "local echo MCP server"
+      },
+      {
+        "title": "Check behavior",
+        "detail": "initialize and tools.call"
+      },
+      {
+        "title": "Report coverage",
+        "detail": "behavior pass; auth skip"
+      }
+    ],
+    "result": "The bundled echo server is checked over stdio; Cursor/Gemini remain n/a and OAuth is skipped."
+  },
+  "integrations": {
+    "title": "Supported input and output routes",
+    "items": [
+      {
+        "title": "stdio MCP",
+        "detail": "child process transport"
+      },
+      {
+        "title": "MCP SDK",
+        "detail": "protocol handshake and tool calls"
+      },
+      {
+        "title": "HTTP metadata",
+        "detail": "optional OAuth discovery"
+      },
+      {
+        "title": "JSON report",
+        "detail": "CI-readable check rows"
+      },
+      {
+        "title": "SVG badge",
+        "detail": "derived matrix summary"
+      }
+    ]
+  }
+}
