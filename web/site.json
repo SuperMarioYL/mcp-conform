@@ -208,8 +208,8 @@
           "zh": "配置"
         },
         "body": {
-          "en": "Use --base-url only for an HTTP resource whose OAuth metadata you intend to probe. Without it, auth cells remain skip for stdio. The tool call uses echo when available; otherwise it derives minimal arguments from a candidate schema and can skip unsupported synthesized calls. Read the individual report rows rather than interpreting one green badge as universal compatibility.",
-          "zh": "仅在准备探测某个 HTTP 资源的 OAuth 元数据时使用 --base-url。省略后 stdio 的 auth 单元保持 skip。存在 echo 时优先调用，否则从候选工具 Schema 推导最小参数，无法支持的合成调用可能被跳过。应阅读各检查行，不能把绿色徽章理解为全面兼容。"
+          "en": "Use --base-url only for an HTTP resource whose OAuth metadata you intend to probe. Without it, auth cells remain skip for stdio. To verify a specific tool, pass --tool <name> with --args '<json>' to drive an explicit tools/call (a missing tool is then a real fail); without these flags the tool call uses echo when available, otherwise it derives minimal arguments from a candidate schema and can skip unsupported synthesized calls. Read the individual report rows rather than interpreting one green badge as universal compatibility.",
+          "zh": "仅在准备探测某个 HTTP 资源的 OAuth 元数据时使用 --base-url。省略后 stdio 的 auth 单元保持 skip。需要验证指定工具时用 --tool <name> 配合 --args '<json>' 显式驱动一次 tools/call（此时工具缺失会被记为真实 fail）；不带这两个标志时优先调用 echo，否则从候选工具 Schema 推导最小参数，无法支持的合成调用可能被跳过。应阅读各检查行，不能把绿色徽章理解为全面兼容。"
         }
       },
       {
@@ -218,8 +218,8 @@
           "zh": "进一步使用"
         },
         "body": {
-          "en": "Replace the fixture command with the command that starts a server you intend to test. --cwd selects its working directory; --timeout sets the handshake timeout in milliseconds (default 15000). --report and --badge can take output paths. Any fail returns exit 1; skip and n/a do not fail CI.",
-          "zh": "将样本命令替换为准备测试的服务启动命令。--cwd 指定工作目录，--timeout 设置握手超时毫秒数，默认 15000。--report 和 --badge 可指定输出路径。任何 fail 都返回 1，skip 和 n/a 不使 CI 失败。"
+          "en": "Replace the fixture command with the command that starts a server you intend to test. --cwd selects its working directory; --timeout sets the handshake and per-request timeout in milliseconds (default 15000). --report and --badge can take output paths. Any fail returns exit 1; skip and n/a do not fail CI.",
+          "zh": "将样本命令替换为准备测试的服务启动命令。--cwd 指定工作目录，--timeout 设置握手与每个协议请求的超时毫秒数，默认 15000。--report 和 --badge 可指定输出路径。任何 fail 都返回 1，skip 和 n/a 不使 CI 失败。"
         },
         "code": "node dist/cli.js run node dist/fixtures/echo-server/server.js --json\nnode dist/cli.js run node dist/fixtures/echo-server/server.js --badge --report"
       }
