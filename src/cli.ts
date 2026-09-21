@@ -44,12 +44,26 @@ program
     false
   )
   .option("--cwd <dir>", "Working directory for the spawned server.")
-  .option("--timeout <ms>", "Handshake timeout in milliseconds.", "15000")
+  .option(
+    "--timeout <ms>",
+    "Handshake and per-request timeout in milliseconds.",
+    "15000"
+  )
   .option(
     "--base-url <url>",
     "HTTP base URL of the server's resource, to run the live Zero-Touch OAuth " +
       "discovery probe (Protected Resource Metadata + WWW-Authenticate). When " +
       "omitted (stdio) the auth axis resolves to skip."
+  )
+  .option(
+    "--tool <name>",
+    "Call this named tool for the tools/call round-trip. A missing tool is " +
+      "then a real fail; without this flag the harness falls back to the " +
+      "server's first tool with harness-synthesized args."
+  )
+  .option(
+    "--args <json>",
+    'JSON object of arguments for --tool, e.g. \'{"message":"hi"}\'.'
   )
   .action(async (serverCmd: string[], opts) => {
     const [command, ...args] = serverCmd;
@@ -58,12 +72,34 @@ program
       process.exit(2);
     }
 
+    let toolArgs: Record<string, unknown> | undefined;
+    if (opts.args !== undefined) {
+      if (!opts.tool) {
+        console.error("error: --args requires --tool <name>");
+        process.exit(2);
+      }
+      try {
+        const parsed = JSON.parse(String(opts.args));
+        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+          throw new Error("not a JSON object");
+        }
+        toolArgs = parsed as Record<string, unknown>;
+      } catch (err) {
+        console.error(
+          `error: --args must be a JSON object literal: ${errMessage(err)}`
+        );
+        process.exit(2);
+      }
+    }
+
     const report = await run({
       command,
       args,
       cwd: opts.cwd,
       timeoutMs: Number(opts.timeout) || 15_000,
       baseUrl: opts.baseUrl,
+      tool: opts.tool,
+      toolArgs,
     });
 
     if (opts.json) {
@@ -104,3 +140,7 @@ program.parseAsync(process.argv).catch((err) => {
   console.error(err instanceof Error ? err.stack ?? err.message : String(err));
   process.exit(2);
 });
+
+function errMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}

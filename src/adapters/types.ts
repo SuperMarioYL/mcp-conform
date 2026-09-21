@@ -44,6 +44,11 @@ export interface ConformanceReport {
  * spawn happens exactly once and every adapter observes the same live server.
  * `baseUrl` is the optional HTTP base URL for the Zero-Touch OAuth auth-axis
  * probe; when absent (the stdio case) the auth checks resolve to `skip`.
+ * `requestTimeoutMs` bounds each protocol request (tools/list, tools/call) so a
+ * hang-after-handshake server fails fast instead of riding the SDK's 60s
+ * default. `tool`/`toolArgs` carry the user's explicit `--tool`/`--args` choice;
+ * when `tool` is set its selection is intentional (a missing tool is a real
+ * fail, not a synthesized skip).
  */
 export interface AdapterContext {
   client: ClientId;
@@ -51,6 +56,12 @@ export interface AdapterContext {
   serverArgs: string[];
   /** Optional HTTP base URL for the auth-axis OAuth discovery probe. */
   baseUrl?: string;
+  /** Per-request timeout in ms for tools/list and tools/call. */
+  requestTimeoutMs?: number;
+  /** User-requested tool name (--tool). Explicit => missing tool is a fail. */
+  tool?: string;
+  /** Arguments for the user-requested tool (--args, parsed JSON object). */
+  toolArgs?: Record<string, unknown>;
 }
 
 /**

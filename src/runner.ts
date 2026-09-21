@@ -47,6 +47,10 @@ export interface RunOptions {
    * the auth axis resolves to `skip` — faithfully, stdio has no HTTP surface.
    */
   baseUrl?: string;
+  /** User-requested tool name (--tool). Explicit => missing tool is a fail. */
+  tool?: string;
+  /** Arguments for the user-requested tool (--args, parsed JSON object). */
+  toolArgs?: Record<string, unknown>;
 }
 
 /**
@@ -72,10 +76,22 @@ export async function run(opts: RunOptions): Promise<ConformanceReport> {
     stderr: "pipe",
   });
 
+  // Drain the piped stderr immediately. Nothing reading the SDK's PassThrough
+  // lets pipe backpressure stall a server whose stderr writes are synchronous
+  // (Python logging / Go log / C fprintf): the write(2) blocks once the OS
+  // pipe fills, the server stops answering the protocol, and the harness
+  // false-fails with "handshake timed out". Keep a small tail so connection
+  // failures can still surface the server's last words.
+  const stderrTail = drainStderr(transport);
+
   const client = new Client(
     { name: "mcp-conform", version: VERSION },
     { capabilities: {} }
   );
+
+  // Per-request timeout for the tools axis (the SDK default is 60s, 2x over
+  // the §3 sub-30s run contract on a hang-after-handshake server).
+  const requestTimeoutMs = opts.timeoutMs ?? 15_000;
 
   try {
     await withTimeout(
@@ -90,7 +106,10 @@ export async function run(opts: RunOptions): Promise<ConformanceReport> {
     // real adapter we still run the OAuth probe — over stdio (no baseUrl) that
     // faithfully resolves to `skip`, keeping the matrix shape identical to a
     // green run instead of collapsing the auth cell to an empty `n/a`.
-    const detail = `failed to connect/handshake with server: ${errMessage(err)}`;
+    const tail = stderrTail().trim();
+    const detail =
+      `failed to connect/handshake with server: ${errMessage(err)}` +
+      (tail ? ` | server stderr tail: ${tail.slice(-300)}` : "");
     const skipDetail = "skipped: handshake failed";
     for (const adapter of adapters) {
       if (adapter.implemented) {
@@ -152,6 +171,9 @@ export async function run(opts: RunOptions): Promise<ConformanceReport> {
         serverCmd: opts.command,
         serverArgs: opts.args ?? [],
         baseUrl: opts.baseUrl,
+        requestTimeoutMs,
+        tool: opts.tool,
+        toolArgs: opts.toolArgs,
       };
       report.results.push(...(await adapter.run(ctx, client)));
     }
@@ -161,6 +183,27 @@ export async function run(opts: RunOptions): Promise<ConformanceReport> {
   }
 
   return report;
+}
+
+/**
+ * Drain a transport's piped stderr so the child can never block on a full
+ * pipe, keeping a capped tail for failure diagnostics. Safe to call before
+ * `start()` — the SDK exposes the PassThrough immediately for exactly this
+ * purpose ("allowing callers to attach listeners before the start method is
+ * invoked"). Returns a getter for the captured tail.
+ */
+function drainStderr(
+  transport: StdioClientTransport,
+  cap = 2048
+): () => string {
+  let tail = "";
+  const stream = transport.stderr;
+  if (!stream) return () => tail;
+  stream.on("data", (chunk: Buffer | string) => {
+    const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+    tail = (tail + text).slice(-cap);
+  });
+  return () => tail;
 }
 
 /** True iff no `fail` rows exist (n/a and skip do not fail the run). */

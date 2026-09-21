@@ -268,9 +268,10 @@ export async function checkOAuth(
   // throws ERR_INVALID_URL outside the per-probe try/catch blocks below, which
   // would reject the whole run and crash the CLI with no matrix. Fail both
   // auth rows gracefully instead — the CI contract is "exit 1 on a fail row".
-  let origin: string;
+  // (The parsed URL itself is recomputed in the metadata block below; here we
+  // only validate parseability.)
   try {
-    origin = new URL(baseUrl).origin;
+    new URL(baseUrl);
   } catch (err) {
     const detail = `invalid base URL "${baseUrl}": ${errMessage(err)}`;
     results.push(
@@ -281,36 +282,60 @@ export async function checkOAuth(
   }
 
   // --- 1. Protected Resource Metadata ---
-  const metadataUrl = `${origin}/.well-known/oauth-protected-resource`;
+  // RFC 9728 §3.1 inserts the well-known prefix BETWEEN the host component and
+  // the path component of the resource identifier (resource
+  // https://host/p serves /.well-known/oauth-protected-resource/p). The
+  // v0.6.0 probe asked the path-less root URL only, so a conformant resource
+  // at the README's own documented shape (--base-url https://api.example.com/mcp)
+  // serving only the path-inserted document false-failed with 404. When the
+  // resource has a path, fall back to the legacy root URL when the
+  // path-inserted probe does not return a usable document (404 or otherwise)
+  // so deployments serving either form pass; the detail records which URL
+  // answered.
+  const parsed = new URL(baseUrl);
+  const wellKnown = "/.well-known/oauth-protected-resource";
+  const resourcePath = parsed.pathname.replace(/\/+$/, "");
+  const metadataUrls =
+    resourcePath && resourcePath !== "/"
+      ? [`${parsed.origin}${wellKnown}${resourcePath}`, `${parsed.origin}${wellKnown}`]
+      : [`${parsed.origin}${wellKnown}`];
   try {
     // fetchJsonWithTimeout bounds BOTH the response headers AND the res.json()
     // body read by the per-probe timeout — a slow-dripping 200 is aborted and
     // surfaced as a "probe timed out" fail instead of stalling the CLI.
-    const result = await fetchJsonWithTimeout(
-      fetchImpl,
-      metadataUrl,
-      { headers: { accept: "application/json" } },
-      probeTimeoutMs
-    );
-    if (!result.ok) {
+    let result: { status: number; ok: boolean; doc?: unknown } | undefined;
+    let answeredUrl = metadataUrls[0]!;
+    for (const url of metadataUrls) {
+      answeredUrl = url;
+      result = await fetchJsonWithTimeout(
+        fetchImpl,
+        url,
+        { headers: { accept: "application/json" } },
+        probeTimeoutMs
+      );
+      // A non-ok answer on the path-inserted URL falls through to the
+      // legacy root URL; an ok document is final.
+      if (result.ok) break;
+    }
+    if (!result!.ok) {
       results.push(
         row(
           client,
           "oauth.protected_resource_metadata",
           "fail",
-          `GET ${metadataUrl} -> HTTP ${result.status} (expected 200 with metadata)`
+          `GET ${answeredUrl} -> HTTP ${result!.status} (expected 200 with metadata)`
         )
       );
     } else {
-      const check = validateProtectedResourceMetadata(result.doc);
+      const check = validateProtectedResourceMetadata(result!.doc);
       results.push(
         row(
           client,
           "oauth.protected_resource_metadata",
           check.ok ? "pass" : "fail",
           check.ok
-            ? `valid Protected Resource Metadata: ${check.detail}`
-            : `invalid Protected Resource Metadata: ${check.detail}`
+            ? `valid Protected Resource Metadata at ${answeredUrl}: ${check.detail}`
+            : `invalid Protected Resource Metadata at ${answeredUrl}: ${check.detail}`
         )
       );
     }

@@ -113,7 +113,7 @@ The bundled echo server is checked over stdio; Cursor/Gemini remain n/a and OAut
 
 ## 用法
 
-将样本命令替换为准备测试的服务启动命令。--cwd 指定工作目录，--timeout 设置握手超时毫秒数，默认 15000。--report 和 --badge 可指定输出路径。任何 fail 都返回 1，skip 和 n/a 不使 CI 失败。
+将样本命令替换为准备测试的服务启动命令。--cwd 指定工作目录，--timeout 设置握手与每个协议请求的超时毫秒数（默认 15000）。--report 和 --badge 可指定输出路径。任何 fail 都返回 1，skip 和 n/a 不使 CI 失败。
 
 ```bash
 node dist/cli.js run node dist/fixtures/echo-server/server.js --json
@@ -122,7 +122,7 @@ node dist/cli.js run node dist/fixtures/echo-server/server.js --badge --report
 
 ## 配置
 
-仅在准备探测某个 HTTP 资源的 OAuth 元数据时使用 --base-url。省略后 stdio 的 auth 单元保持 skip。存在 echo 时优先调用，否则从候选工具 Schema 推导最小参数，无法支持的合成调用可能被跳过。应阅读各检查行，不能把绿色徽章理解为全面兼容。
+仅在准备探测某个 HTTP 资源的 OAuth 元数据时使用 --base-url。省略后 stdio 的 auth 单元保持 skip。需要验证指定工具时用 --tool <name> 配合 --args '<json>' 显式驱动一次 tools/call（此时工具缺失会被记为真实 fail）；不带这两个标志时优先调用 echo，否则从候选工具 Schema 推导最小参数，无法支持的合成调用可能被跳过。应阅读各检查行，不能把绿色徽章理解为全面兼容。
 
 ## 集成与职责分工
 
@@ -150,6 +150,8 @@ node dist/cli.js run node dist/fixtures/echo-server/server.js --badge --report
 - 本地示例未运行 OAuth 发现或端到端授权。
 
 已实现 stdio 握手与工具检查、稳定报告行、JSON 和徽章输出，以及可选 HTTP 发现探测。更深入的 OAuth 授权和真实客户端兼容覆盖仍属后续方向。支持行为的变更见 CHANGELOG.md。
+
+v0.7.0：修复 chatty 服务（大量 stderr 输出）导致的停滞误报、限定 tools 请求超时、按 RFC 9728 §3.1 探测带路径的 well-known 元数据，并新增 --tool/--args 显式回环（详见 CHANGELOG.md）。
 
 ## 许可与贡献
 

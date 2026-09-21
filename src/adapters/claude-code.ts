@@ -31,9 +31,15 @@ export const claudeCodeAdapter: ClientAdapter = {
     const client = mcpClient as Client;
     const results: CheckResult[] = [];
 
-    // Behavior axis.
+    // Behavior axis. When the user named a tool (--tool) that choice is
+    // explicit: a missing tool is a real fail, not a synthesized skip.
+    const callArg = ctx.tool
+      ? { toolName: ctx.tool, args: ctx.toolArgs ?? {}, explicit: true }
+      : ECHO_CALL;
     results.push(...checkHandshake(ctx.client, client));
-    results.push(...(await checkTools(ctx.client, client, ECHO_CALL)));
+    results.push(
+      ...(await checkTools(ctx.client, client, callArg, ctx.requestTimeoutMs))
+    );
 
     // Auth axis — Zero-Touch OAuth discovery-shape probe. Over stdio (no HTTP
     // base URL) this resolves to `skip` (yellow) — faithfully, stdio has no

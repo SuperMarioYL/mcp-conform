@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-22
+
+### Fixed
+- **stderr pipe stall / false fail** — the runner passed `stderr: "pipe"` to the
+  server transport but nothing ever read the piped stream, so a server whose
+  stderr writes are synchronous (Python logging, Go log, C fprintf) blocked
+  inside `write(2)` once the OS pipe filled and the harness false-failed with
+  "handshake timed out" (repro: a 1KB-stderr writer passed in 0.0s while a
+  200KB writer overran its own timeout budget and once never settled at all).
+  The transport's stderr is now drained immediately (with a capped tail that
+  failure details surface).
+- **tools-axis request timeout** — `tools/list` and `tools/call` rode the MCP
+  SDK's 60s default request timeout, so a server that handshakes and then goes
+  silent stalled the CLI 60.0s (measured), 2x over the sub-30s run contract.
+  Both requests now honor the run timeout (15s default), like the auth-axis
+  probes since v0.4.0.
+- **RFC 9728 §3.1 well-known path insertion** — the Protected Resource Metadata
+  probe built its URL from the origin only, dropping the resource path, so a
+  fully conformant resource at the documented `--base-url
+  https://api.example.com/mcp` shape that serves only the path-inserted
+  document false-failed with 404. The probe now asks the path-inserted URL
+  first (per RFC 9728 §3.1) and falls back to the legacy root URL when the
+  inserted probe does not return a usable document.
+- **demo workflow gif push** — the tag-triggered demo job pushed its gif
+  commit straight to `main` and was rejected non-fast-forward whenever
+  site-refresh commits had landed between tags (every tag run since v0.4.0
+  failed). The job now rebases the single-file gif commit onto latest `main`
+  before pushing, soft-exits when vhs produced no gif, and keeps the existing
+  no-change soft exit.
+
+### Added
+- **--tool / --args flags** — drive an explicit `tools/call` round-trip on a
+  named tool (`--args` is a JSON object literal). A missing explicitly-named
+  tool is a real fail; without the flags the harness keeps the v0.4.0
+  fallback behavior (first tool, synthesized args, skip on synthesized
+  failure). This completes the deferral the v0.4.0 m12 fix documented in
+  code.
+
 ## [0.6.0] - 2026-09-04
 
 ### Fixed

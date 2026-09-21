@@ -36,19 +36,32 @@ function row(
 /**
  * Run `tools/list` and a `tools/call`. The `callArg` shapes the round-trip
  * payload for the canonical echo fixture; adapters can pass a server-specific
- * argument when they know the tool surface.
+ * argument when they know the tool surface. `requestTimeoutMs` bounds each
+ * protocol request: without it a hang-after-handshake server rides the SDK's
+ * DEFAULT_REQUEST_TIMEOUT_MSEC (60s) per request, blowing the §3 "sub-30s
+ * total run" contract (the same failure class the m13 OAuth-probe timeout
+ * fixed for the auth axis).
  */
 export async function checkTools(
   client: ClientId,
   mcpClient: Client,
-  callArg: { toolName?: string; args?: Record<string, unknown> } = {}
+  callArg: {
+    toolName?: string;
+    args?: Record<string, unknown>;
+    /** True when the user explicitly named the tool (--tool). */
+    explicit?: boolean;
+  } = {},
+  requestTimeoutMs?: number
 ): Promise<CheckResult[]> {
   const results: CheckResult[] = [];
+  const requestOptions = requestTimeoutMs
+    ? { timeout: requestTimeoutMs }
+    : undefined;
 
   // --- tools/list shape ---
   let tools: Array<z.infer<typeof ToolShape>> = [];
   try {
-    const listed = await mcpClient.listTools();
+    const listed = await mcpClient.listTools({}, requestOptions);
     const parsed = z.array(ToolShape).safeParse(listed.tools);
     if (!parsed.success) {
       results.push(
@@ -105,32 +118,48 @@ export async function checkTools(
   }
 
   // Resolve the target tool. Prefer the adapter-requested toolName; if it is
-  // not advertised by this server, fall back to the first tool. Critically,
-  // when we fall back we must NOT force the requested tool's args (e.g. the
+  // not advertised by this server, fall back to the first tool — but only for
+  // the implicit echo-probe default. When the user explicitly named a tool
+  // (--tool), a missing tool is a REAL server failure (the user's intent was
+  // explicit), not a synthesized skip.
+  //
+  // When we fall back we must NOT force the requested tool's args (e.g. the
   // echo fixture's {message}) onto an unrelated tool — that would false-fail
   // any conformant server whose first tool needs different args (e.g. a URL).
   // Instead we derive a minimal valid arguments object from the fallback
   // tool's OWN inputSchema required fields. And if even that synthesized call
   // does not pass, we record `skip` rather than `fail`: the failure stems from
-  // the harness being unable to drive a real round-trip (no requested tool on
-  // the server, no --tool/--args override — deferred to a follow-up feature),
-  // NOT from the server being non-conformant. A conformant server that accepts
-  // the synthesized args still reaches `pass`.
+  // the harness being unable to drive a real round-trip, NOT from the server
+  // being non-conformant. A conformant server that accepts the synthesized
+  // args still reaches `pass`.
   const requestedTool = callArg.toolName
     ? tools.find((t) => t.name === callArg.toolName)
     : undefined;
+  if (callArg.toolName && !requestedTool && callArg.explicit) {
+    results.push(
+      row(
+        client,
+        "tools.call_roundtrip",
+        "fail",
+        `tools/call "${callArg.toolName}" failed: tool is not advertised by the server (tools/list: ${tools.map((t) => t.name).join(", ") || "no tools"})`
+      )
+    );
+    return results;
+  }
   const targetTool = requestedTool ?? tools[0]!;
   const target = targetTool.name;
-  /** True when the adapter's requested tool is not on this server. */
+  /** True when the adapter's implicit requested tool is not on this server. */
   const isFallback = !requestedTool;
   const args = isFallback
     ? deriveMinimalArgs(targetTool.inputSchema)
     : callArg.args ?? {};
-  const fallbackNote =
-    "cannot verify without an explicit --tool/--args (deferred)";
 
   try {
-    const callResult = await mcpClient.callTool({ name: target, arguments: args });
+    const callResult = await mcpClient.callTool(
+      { name: target, arguments: args },
+      undefined,
+      requestOptions
+    );
     const content = (callResult as { content?: unknown }).content;
     const parsed = z.array(ContentBlock).safeParse(content);
     if (!parsed.success) {
@@ -140,7 +169,7 @@ export async function checkTools(
           client,
           "tools.call_roundtrip",
           isFallback ? "skip" : "fail",
-          isFallback ? `${detail} (${fallbackNote})` : detail
+          isFallback ? `${detail} (harness fallback: use --tool/--args to drive an explicit round-trip)` : detail
         )
       );
     } else if ((callResult as { isError?: boolean }).isError) {
@@ -150,7 +179,7 @@ export async function checkTools(
           client,
           "tools.call_roundtrip",
           isFallback ? "skip" : "fail",
-          isFallback ? `${detail} (${fallbackNote})` : detail
+          isFallback ? `${detail} (harness fallback: use --tool/--args to drive an explicit round-trip)` : detail
         )
       );
     } else {
@@ -170,7 +199,7 @@ export async function checkTools(
         client,
         "tools.call_roundtrip",
         isFallback ? "skip" : "fail",
-        isFallback ? `${detail} (${fallbackNote})` : detail
+        isFallback ? `${detail} (harness fallback: use --tool/--args to drive an explicit round-trip)` : detail
       )
     );
   }

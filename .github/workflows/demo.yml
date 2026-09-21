@@ -18,6 +18,18 @@ jobs:
       - run: |
           git config user.name  "${{ github.actor }}"
           git config user.email "${{ github.actor }}@users.noreply.github.com"
+          # vhs occasionally produces no gif without failing — degrade to a
+          # no-op instead of a red run.
+          if [ ! -f assets/demo.gif ]; then
+            echo "no demo.gif produced by vhs — nothing to commit"
+            exit 0
+          fi
           git add assets/demo.gif
           git commit -m "chore: render demo gif" || { echo "no change"; exit 0; }
-          git push origin HEAD:main   # HEAD:main works on tag-triggered (detached HEAD) runs too
+          # Site-refresh commits land on main between tags, so a direct
+          # HEAD:main push is rejected non-fast-forward (every tag run since
+          # v0.4.0 failed this way). Rebase the single-file gif commit onto
+          # latest main before pushing.
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main

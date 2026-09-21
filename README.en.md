@@ -113,7 +113,7 @@ The complete command and output are recorded in [docs/demo-results.json](./docs/
 
 ## Usage
 
-Replace the fixture command with the command that starts a server you intend to test. --cwd selects its working directory; --timeout sets the handshake timeout in milliseconds (default 15000). --report and --badge can take output paths. Any fail returns exit 1; skip and n/a do not fail CI.
+Replace the fixture command with the command that starts a server you intend to test. --cwd selects its working directory; --timeout sets the handshake and per-request timeout in milliseconds (default 15000). --report and --badge can take output paths. Any fail returns exit 1; skip and n/a do not fail CI.
 
 ```bash
 node dist/cli.js run node dist/fixtures/echo-server/server.js --json
@@ -122,7 +122,7 @@ node dist/cli.js run node dist/fixtures/echo-server/server.js --badge --report
 
 ## Configuration
 
-Use --base-url only for an HTTP resource whose OAuth metadata you intend to probe. Without it, auth cells remain skip for stdio. The tool call uses echo when available; otherwise it derives minimal arguments from a candidate schema and can skip unsupported synthesized calls. Read the individual report rows rather than interpreting one green badge as universal compatibility.
+Use --base-url only for an HTTP resource whose OAuth metadata you intend to probe. Without it, auth cells remain skip for stdio. To verify a specific tool, pass --tool <name> with --args '<json>' to drive an explicit tools/call (a missing tool is then a real fail); without these flags the tool call uses echo when available, otherwise it derives minimal arguments from a candidate schema and can skip unsupported synthesized calls. Read the individual report rows rather than interpreting one green badge as universal compatibility.
 
 ## Integrations and responsibilities
 
@@ -150,6 +150,8 @@ The report describes this harness’s protocol checks. The claude-code row is an
 - The offline example does not exercise OAuth discovery or end-to-end authorization.
 
 Implemented: stdio handshake/tool checks, stable report rows, JSON/badge outputs and optional HTTP discovery probes. Deeper OAuth authorization and real client-specific compatibility coverage remain future work. See CHANGELOG.md for supported behavior changes.
+
+v0.7.0: fixes stalls/false failures from chatty servers with heavy stderr output, bounds the tools-axis request timeout, probes the path-inserted RFC 9728 §3.1 well-known metadata URL, and adds the --tool/--args explicit round-trip (see CHANGELOG.md).
 
 ## License and contributions
 
