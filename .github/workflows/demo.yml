@@ -30,6 +30,9 @@ jobs:
           # HEAD:main push is rejected non-fast-forward (every tag run since
           # v0.4.0 failed this way). Rebase the single-file gif commit onto
           # latest main before pushing.
+          # --autostash: the tape's own `npm install` can leave a tracked file
+          # (e.g. package-lock.json) rewritten; without it the rebase refuses a
+          # dirty worktree and the whole job goes red.
           git fetch origin main
-          git rebase origin/main
+          git rebase --autostash origin/main
           git push origin HEAD:main
