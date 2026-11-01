@@ -288,10 +288,16 @@ export async function checkOAuth(
   // v0.6.0 probe asked the path-less root URL only, so a conformant resource
   // at the README's own documented shape (--base-url https://api.example.com/mcp)
   // serving only the path-inserted document false-failed with 404. When the
-  // resource has a path, fall back to the legacy root URL when the
-  // path-inserted probe does not return a usable document (404 or otherwise)
-  // so deployments serving either form pass; the detail records which URL
-  // answered.
+  // resource has a path, the legacy root URL is the compatibility fallback for
+  // deployments that serve that form instead.
+  //
+  // A candidate counts as usable only when it answers 2xx AND its body
+  // validates as Protected Resource Metadata. Falling back on the status alone
+  // would leave a static host that answers the path-inserted URL with a 2xx
+  // non-metadata page (an SPA catch-all) false-failing a resource whose root
+  // URL does serve the document. A probe timeout is different: it escapes this
+  // block (via the outer catch) so a non-responsive resource is not masked by
+  // a second request.
   const parsed = new URL(baseUrl);
   const wellKnown = "/.well-known/oauth-protected-resource";
   const resourcePath = parsed.pathname.replace(/\/+$/, "");
@@ -303,39 +309,46 @@ export async function checkOAuth(
     // fetchJsonWithTimeout bounds BOTH the response headers AND the res.json()
     // body read by the per-probe timeout — a slow-dripping 200 is aborted and
     // surfaced as a "probe timed out" fail instead of stalling the CLI.
-    let result: { status: number; ok: boolean; doc?: unknown } | undefined;
-    let answeredUrl = metadataUrls[0]!;
+    const failures: string[] = [];
+    let valid: { url: string; detail: string } | undefined;
     for (const url of metadataUrls) {
-      answeredUrl = url;
-      result = await fetchJsonWithTimeout(
+      const result = await fetchJsonWithTimeout(
         fetchImpl,
         url,
         { headers: { accept: "application/json" } },
         probeTimeoutMs
       );
-      // A non-ok answer on the path-inserted URL falls through to the
-      // legacy root URL; an ok document is final.
-      if (result.ok) break;
+      if (!result.ok) {
+        failures.push(
+          `GET ${url} -> HTTP ${result.status} (expected 200 with metadata)`
+        );
+        continue;
+      }
+      const check = validateProtectedResourceMetadata(result.doc);
+      if (check.ok) {
+        valid = { url, detail: check.detail };
+        break;
+      }
+      failures.push(
+        `invalid Protected Resource Metadata at ${url}: ${check.detail}`
+      );
     }
-    if (!result!.ok) {
+    if (valid) {
+      results.push(
+        row(
+          client,
+          "oauth.protected_resource_metadata",
+          "pass",
+          `valid Protected Resource Metadata at ${valid.url}: ${valid.detail}`
+        )
+      );
+    } else {
       results.push(
         row(
           client,
           "oauth.protected_resource_metadata",
           "fail",
-          `GET ${answeredUrl} -> HTTP ${result!.status} (expected 200 with metadata)`
-        )
-      );
-    } else {
-      const check = validateProtectedResourceMetadata(result!.doc);
-      results.push(
-        row(
-          client,
-          "oauth.protected_resource_metadata",
-          check.ok ? "pass" : "fail",
-          check.ok
-            ? `valid Protected Resource Metadata at ${answeredUrl}: ${check.detail}`
-            : `invalid Protected Resource Metadata at ${answeredUrl}: ${check.detail}`
+          failures.join("; ")
         )
       );
     }

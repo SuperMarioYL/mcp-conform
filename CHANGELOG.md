@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-02
+
+### Fixed
+- **`tools/list` pagination** — the tools axis called `tools/list` once and
+  ignored the result's `nextCursor`, so only the first page of a paginated
+  server was inspected. A server that advertises its tools across pages had an
+  incomplete count in `tools.list_schema` and, worse, `--tool <name>` for a
+  tool listed on a later page hard-failed with "tool is not advertised by the
+  server" — a conformance tool rejecting a conformant server. The harness now
+  walks the cursor chain (bounded, and it fails on a repeated cursor or a
+  non-terminating walk) before resolving the round-trip target.
+- **Protected Resource Metadata fallback for an unusable 2xx** — the RFC 9728
+  §3.1 probe broke out of its candidate loop as soon as a URL answered 2xx,
+  before validating the body. A static host that answers the path-inserted
+  well-known URL with an SPA catch-all (200 + HTML) therefore false-failed a
+  resource whose legacy root URL served valid metadata, even though the code
+  documented falling back when the probe "does not return a usable document
+  (404 or otherwise)". A candidate now counts as usable only when it answers
+  2xx *and* the document validates; otherwise the next URL is tried and the
+  fail detail lists every candidate that did not work. A probe timeout still
+  aborts the whole check.
+- **clean error for unwritable `--report` / `--badge` paths** — both writes
+  were unguarded `writeFileSync` calls, so a missing parent directory leaked a
+  raw Node stack trace (`Error: ENOENT ... at writeFileSync`) after the matrix
+  had already been printed. They now print one `error: cannot write <path>:
+  ...` line and exit 2, matching the CLI's other usage errors.
+- **strict `--timeout` validation** — `Number(opts.timeout) || 15000` silently
+  accepted `abc` and `0` as "use the default" and passed a negative value
+  straight to `setTimeout`, producing an immediate bogus "handshake timed out"
+  fail. A non-integer or non-positive value is now a usage error (exit 2)
+  before the server is spawned.
+
 ## [0.7.0] - 2026-09-22
 
 ### Fixed

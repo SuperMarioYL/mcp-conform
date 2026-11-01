@@ -96,7 +96,7 @@ program
       command,
       args,
       cwd: opts.cwd,
-      timeoutMs: Number(opts.timeout) || 15_000,
+      timeoutMs: parseTimeout(opts.timeout),
       baseUrl: opts.baseUrl,
       tool: opts.tool,
       toolArgs,
@@ -114,7 +114,7 @@ program
         typeof opts.report === "string"
           ? resolve(opts.report)
           : resolve("report.json");
-      writeFileSync(reportPath, JSON.stringify(report, null, 2) + "\n");
+      writeOutput(reportPath, JSON.stringify(report, null, 2) + "\n");
       if (!opts.json) console.error(`wrote ${reportPath}`);
     }
 
@@ -123,8 +123,8 @@ program
       const dir = typeof opts.badge === "string" ? resolve(opts.badge) : resolve(".");
       const svgPath = resolve(dir, "badge.svg");
       const jsonPath = resolve(dir, "badge.json");
-      writeFileSync(svgPath, buildBadgeSvg(report));
-      writeFileSync(jsonPath, JSON.stringify(buildBadgeJson(report), null, 2) + "\n");
+      writeOutput(svgPath, buildBadgeSvg(report));
+      writeOutput(jsonPath, JSON.stringify(buildBadgeJson(report), null, 2) + "\n");
       if (!opts.json) {
         console.error(`wrote ${svgPath}`);
         console.error(`wrote ${jsonPath}`);
@@ -140,6 +140,37 @@ program.parseAsync(process.argv).catch((err) => {
   console.error(err instanceof Error ? err.stack ?? err.message : String(err));
   process.exit(2);
 });
+
+/**
+ * Parse `--timeout` as a positive integer of milliseconds. A bad value is a
+ * usage error (exit 2), not a silent fallback: grading a server against a
+ * timeout the user did not ask for would make the conformance verdict
+ * meaningless, and a negative value turns into an immediate bogus fail.
+ */
+function parseTimeout(raw: string): number {
+  const ms = Number(raw);
+  if (!Number.isInteger(ms) || ms <= 0) {
+    console.error(
+      `error: --timeout must be a positive integer number of milliseconds (got "${raw}")`
+    );
+    process.exit(2);
+  }
+  return ms;
+}
+
+/**
+ * Write one output file. A failure (missing parent directory, permission
+ * denied) is reported as a single clean `error:` line and exit 2, matching the
+ * other CLI usage errors instead of leaking a Node stack trace.
+ */
+function writeOutput(path: string, content: string): void {
+  try {
+    writeFileSync(path, content);
+  } catch (err) {
+    console.error(`error: cannot write ${path}: ${errMessage(err)}`);
+    process.exit(2);
+  }
+}
 
 function errMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);

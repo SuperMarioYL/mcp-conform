@@ -12,6 +12,13 @@ import type { Axis, CheckResult, ClientId } from "../adapters/types.js";
 
 const AXIS: Axis = "behavior";
 
+/**
+ * Safety bound on the `tools/list` pagination walk. A conformant server ends
+ * pagination with an absent `nextCursor`; this cap only stops a server that
+ * keeps handing out cursors forever from hanging the run.
+ */
+const MAX_TOOL_PAGES = 100;
+
 /** Minimal shape of a single tool entry in a ListToolsResult. */
 const ToolShape = z.object({
   name: z.string().min(1),
@@ -58,27 +65,64 @@ export async function checkTools(
     ? { timeout: requestTimeoutMs }
     : undefined;
 
-  // --- tools/list shape ---
+  // --- tools/list shape (every page) ---
+  // `tools/list` is a PaginatedResult: a server with more tools than its page
+  // size returns `nextCursor`, and the remaining tools are only returned when
+  // that cursor is sent back. A single request therefore under-reports the
+  // tool set and falsely fails an explicitly named `--tool` that the server
+  // lists on a later page, so walk the cursor chain until it ends.
   let tools: Array<z.infer<typeof ToolShape>> = [];
   try {
-    const listed = await mcpClient.listTools({}, requestOptions);
-    const parsed = z.array(ToolShape).safeParse(listed.tools);
-    if (!parsed.success) {
-      results.push(
-        row(
-          client,
-          "tools.list_schema",
-          "fail",
-          `tools/list returned an invalid ListToolsResult: ${parsed.error.issues[0]?.message ?? "unknown"}`
-        )
+    const seenCursors = new Set<string>();
+    let cursor: string | undefined;
+    let pages = 0;
+    for (;;) {
+      if (pages >= MAX_TOOL_PAGES) {
+        const detail = `tools/list pagination did not terminate after ${MAX_TOOL_PAGES} pages`;
+        results.push(row(client, "tools.list_schema", "fail", detail));
+        results.push(
+          row(client, "tools.call_roundtrip", "skip", "skipped: tools/list pagination")
+        );
+        return results;
+      }
+      const listed = await mcpClient.listTools(
+        cursor ? { cursor } : {},
+        requestOptions
       );
-      // Without a valid list we cannot meaningfully round-trip a call.
-      results.push(
-        row(client, "tools.call_roundtrip", "skip", "skipped: tools/list invalid")
-      );
-      return results;
+      pages++;
+      const parsed = z.array(ToolShape).safeParse(listed.tools);
+      if (!parsed.success) {
+        results.push(
+          row(
+            client,
+            "tools.list_schema",
+            "fail",
+            `tools/list returned an invalid ListToolsResult: ${parsed.error.issues[0]?.message ?? "unknown"}`
+          )
+        );
+        // Without a valid list we cannot meaningfully round-trip a call.
+        results.push(
+          row(client, "tools.call_roundtrip", "skip", "skipped: tools/list invalid")
+        );
+        return results;
+      }
+      tools.push(...parsed.data);
+
+      const next = listed.nextCursor;
+      if (!next) break;
+      // A cursor that repeats cannot advance the walk — a server bug, and
+      // retrying it would loop forever.
+      if (seenCursors.has(next)) {
+        const detail = `tools/list pagination repeated cursor "${next}"`;
+        results.push(row(client, "tools.list_schema", "fail", detail));
+        results.push(
+          row(client, "tools.call_roundtrip", "skip", "skipped: tools/list pagination")
+        );
+        return results;
+      }
+      seenCursors.add(next);
+      cursor = next;
     }
-    tools = parsed.data;
     results.push(
       row(
         client,

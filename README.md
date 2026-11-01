@@ -151,7 +151,7 @@ node dist/cli.js run node dist/fixtures/echo-server/server.js --badge --report
 
 已实现 stdio 握手与工具检查、稳定报告行、JSON 和徽章输出，以及可选 HTTP 发现探测。更深入的 OAuth 授权和真实客户端兼容覆盖仍属后续方向。支持行为的变更见 CHANGELOG.md。
 
-v0.7.0：修复 chatty 服务（大量 stderr 输出）导致的停滞误报、限定 tools 请求超时、按 RFC 9728 §3.1 探测带路径的 well-known 元数据，并新增 --tool/--args 显式回环（详见 CHANGELOG.md）。
+v0.8.0：跟随 tools/list 的 nextCursor 走完所有分页再判定工具存在性，路径型 well-known 返回 2xx 但内容不可用时回退到根 URL，--report/--badge 写入失败与非法 --timeout 均以清晰的退出码 2 报错（详见 CHANGELOG.md）。
 
 ## 许可与贡献
 

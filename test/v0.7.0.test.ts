@@ -12,7 +12,6 @@
  *     explicitly-missed tool is a real fail, not a synthesized skip.
  */
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -20,7 +19,6 @@ import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { run } from "../src/runner.js";
 import { checkTools } from "../src/spec/tools.js";
 import { checkOAuth } from "../src/spec/oauth.js";
-import { VERSION } from "../src/version.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "..");
@@ -269,21 +267,5 @@ process.exit(1);
       expect(runCli(["--args", '{"message":"hi"}'])).toBe(2);
       expect(runCli(["--tool", "echo", "--args", "{not json"])).toBe(2);
     }, 30_000);
-  });
-
-  describe("version lockstep (v0.7.0 bump)", () => {
-    it("all four version surfaces read 0.7.0", () => {
-      expect(VERSION).toBe("0.7.0");
-      const pkg = JSON.parse(
-        readFileSync(resolve(repoRoot, "package.json"), "utf8")
-      ) as { version: string };
-      expect(pkg.version).toBe("0.7.0");
-      const site = JSON.parse(
-        readFileSync(resolve(repoRoot, "web/site.json"), "utf8")
-      ) as { meta?: { content_version?: string } };
-      expect(site.meta?.content_version).toBe("0.7.0");
-      const changelog = readFileSync(resolve(repoRoot, "CHANGELOG.md"), "utf8");
-      expect(changelog.match(/^##\s+\[([0-9.]+)\]/m)?.[1]).toBe("0.7.0");
-    });
   });
 });

@@ -151,7 +151,7 @@ The report describes this harness’s protocol checks. The claude-code row is an
 
 Implemented: stdio handshake/tool checks, stable report rows, JSON/badge outputs and optional HTTP discovery probes. Deeper OAuth authorization and real client-specific compatibility coverage remain future work. See CHANGELOG.md for supported behavior changes.
 
-v0.7.0: fixes stalls/false failures from chatty servers with heavy stderr output, bounds the tools-axis request timeout, probes the path-inserted RFC 9728 §3.1 well-known metadata URL, and adds the --tool/--args explicit round-trip (see CHANGELOG.md).
+v0.8.0: follows every `tools/list` page via `nextCursor` before judging tool presence, falls back to the root well-known URL when a path-inserted 2xx body is not usable metadata, and reports unwritable `--report`/`--badge` paths and an invalid `--timeout` as clean exit-2 errors (see CHANGELOG.md).
 
 ## License and contributions
 
